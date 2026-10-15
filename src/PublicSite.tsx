@@ -19,6 +19,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
+import { ApiError, api } from "./lib/api";
 
 type Service = {
   title: string;
@@ -132,6 +133,8 @@ function PublicSite() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
   const [formSent, setFormSent] = useState(false);
+  const [submitState, setSubmitState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = "Jojuni Technologies | Build. Secure. Scale.";
@@ -139,9 +142,29 @@ function PublicSite() {
     manifest?.remove();
   }, []);
 
-  const submitContact = (event: FormEvent<HTMLFormElement>) => {
+  const submitContact = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setFormSent(true);
+    const form = new FormData(event.currentTarget);
+    setSubmitState("sending");
+    setSubmitError(null);
+    try {
+      await api.createLead({
+        name: String(form.get("name") ?? ""),
+        email: String(form.get("email") ?? ""),
+        company: String(form.get("company") ?? ""),
+        brief: String(form.get("brief") ?? ""),
+        website: String(form.get("website") ?? ""),
+      });
+      setFormSent(true);
+      setSubmitState("sent");
+    } catch (error) {
+      setSubmitError(
+        error instanceof ApiError
+          ? `${error.message} Try again, or email hello@jojuni.tech directly.`
+          : "Something went wrong sending your brief. Try again, or email hello@jojuni.tech directly.",
+      );
+      setSubmitState("error");
+    }
   };
 
   const scrollTo = (id: string) => {
@@ -564,8 +587,13 @@ function PublicSite() {
                   </div>
                   <label className="form-label">Company<input name="company" className="form-input" placeholder="Company name" /></label>
                   <label className="form-label">What can we help you build?<textarea required name="brief" rows={4} className="form-input resize-none" placeholder="A short description of your project" /></label>
-                  <button type="submit" className="group flex w-full items-center justify-center gap-3 bg-[#d90429] px-7 py-4 font-semibold text-white transition hover:bg-black">
-                    Send project brief <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+                  {/* Honeypot: hidden from humans, filled by bots. The API drops these silently. */}
+                  <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" />
+                  {submitState === "error" && submitError && (
+                    <p className="border border-[#d90429]/40 bg-[#d90429]/5 px-4 py-3 text-sm text-[#9f001d]" role="alert">{submitError}</p>
+                  )}
+                  <button type="submit" disabled={submitState === "sending"} className="group flex w-full items-center justify-center gap-3 bg-[#d90429] px-7 py-4 font-semibold text-white transition hover:bg-black disabled:cursor-wait disabled:opacity-70">
+                    {submitState === "sending" ? "Sending…" : "Send project brief"} <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
                   </button>
                 </form>
               )}

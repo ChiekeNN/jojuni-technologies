@@ -1,4 +1,4 @@
-const CACHE_NAME = "jojuni-workspace-v1";
+const CACHE_NAME = "jojuni-workspace-v2";
 const APP_SHELL = [
   "/workspace",
   "/workspace-manifest.webmanifest",
@@ -23,6 +23,11 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+
+  const url = new URL(event.request.url);
+  // Never cache API responses: workspace data must always be fresh, and the
+  // offline fallback below would otherwise serve stale records.
+  if (url.pathname.startsWith("/api/")) return;
 
   event.respondWith(
     fetch(event.request)

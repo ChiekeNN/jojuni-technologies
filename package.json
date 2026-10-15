@@ -1,14 +1,21 @@
 {
-  "name": "react-vite-tailwind",
+  "name": "jojuni-technologies",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:api": "tsx scripts/dev-api.mjs",
+    "dev:stack": "node scripts/dev-stack.mjs",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p api/tsconfig.json",
+    "db:migrate": "node scripts/db.mjs migrate",
+    "db:seed": "node scripts/db.mjs seed",
+    "db:status": "node scripts/db.mjs status"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.2.0",
     "clsx": "2.1.1",
     "lucide-react": "^1.57.0",
     "motion": "^14.2.0",
@@ -23,8 +30,10 @@
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.1.1",
     "tailwindcss": "4.1.17",
+    "tsx": "^4.23.15",
     "typescript": "5.9.3",
     "vite": "7.3.2",
     "vite-plugin-singlefile": "2.3.0"
-  }
+  },
+  "description": "Jojuni Technologies marketing site + team workspace, deployed on Vercel with a Neon (PostgreSQL) database."
 }
