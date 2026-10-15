@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 250" role="img" aria-labelledby="title desc">
+  <title id="title">Jojuni Technologies</title>
+  <desc id="desc">The official Jojuni Technologies wordmark in red and white.</desc>
+  <rect width="980" height="250" fill="#000000"/>
+  <path fill="#d90429" d="M79 18h105v105c0 72-42 111-108 111-31 0-57-9-76-22l35-57c12 8 25 13 39 13 20 0 29-15 29-45V73H79z"/>
+  <text x="224" y="119" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="125" font-weight="800" letter-spacing="-7">Jojuni</text>
+  <text x="229" y="200" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="58" font-weight="800" letter-spacing="7">TECHNOLOGIES</text>
+</svg>
