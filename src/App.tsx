@@ -1,5 +1,6 @@
 import PublicSite from "./PublicSite";
 import WorkspaceApp from "./WorkspaceApp";
+import { RouterProvider } from "./site/router";
 
 export default function App() {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
@@ -8,5 +9,9 @@ export default function App() {
     return <WorkspaceApp />;
   }
 
-  return <PublicSite />;
+  return (
+    <RouterProvider>
+      <PublicSite />
+    </RouterProvider>
+  );
 }
