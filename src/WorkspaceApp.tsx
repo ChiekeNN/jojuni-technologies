@@ -37,46 +37,20 @@ import {
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
-type Role = "founder" | "accountant" | "staff";
+import type {
+  LedgerEntry,
+  Project,
+  Role,
+  Task,
+  TaskStatus,
+  TransactionType,
+  WorkspaceFile,
+  WorkspaceMessage,
+} from "../shared/types";
+import { ApiError, api } from "./lib/api";
+import { seedFiles, seedLedger, seedMessages, seedProjects, seedTasks, workspaceChannels } from "./lib/seed";
+
 type View = "overview" | "tasks" | "projects" | "messages" | "files" | "finance";
-type TaskStatus = "To do" | "In progress" | "Review" | "Done";
-type TransactionType = "Income" | "Expense";
-
-type Task = {
-  id: number;
-  title: string;
-  project: string;
-  status: TaskStatus;
-  assignee: string;
-  due: string;
-  priority: "Low" | "Medium" | "High";
-};
-
-type Project = {
-  name: string;
-  client: string;
-  progress: number;
-  due: string;
-  color: string;
-  members: string[];
-};
-
-type LedgerEntry = {
-  id: number;
-  date: string;
-  description: string;
-  category: string;
-  type: TransactionType;
-  amount: number;
-};
-
-type WorkspaceFile = {
-  name: string;
-  project: string;
-  size: string;
-  type: "document" | "image" | "sheet";
-  updated: string;
-};
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -88,39 +62,6 @@ const people: Record<Role, { name: string; title: string; initials: string }> = 
   accountant: { name: "Emeka Obi", title: "Accountant", initials: "EO" },
   staff: { name: "Kene Ibe", title: "Product Designer", initials: "KI" },
 };
-
-const projects: Project[] = [
-  { name: "Meridian Commerce", client: "Meridian Retail", progress: 72, due: "Sep 06", color: "#d90429", members: ["AM", "EO", "KI"] },
-  { name: "Northstar Mobile", client: "Northstar Health", progress: 45, due: "Oct 18", color: "#000000", members: ["KI", "BN"] },
-  { name: "Jojuni Automation", client: "Internal", progress: 86, due: "Aug 30", color: "#6f6f6f", members: ["AM", "KI"] },
-];
-
-const initialTasks: Task[] = [
-  { id: 1, title: "Finalize checkout error states", project: "Meridian Commerce", status: "In progress", assignee: "KI", due: "Today", priority: "High" },
-  { id: 2, title: "Review sprint 4 deliverables", project: "Northstar Mobile", status: "Review", assignee: "AM", due: "Today", priority: "High" },
-  { id: 3, title: "Map client onboarding workflow", project: "Jojuni Automation", status: "To do", assignee: "KI", due: "Tomorrow", priority: "Medium" },
-  { id: 4, title: "Connect payment webhook", project: "Meridian Commerce", status: "To do", assignee: "BN", due: "Aug 28", priority: "High" },
-  { id: 5, title: "Prepare usability test notes", project: "Northstar Mobile", status: "In progress", assignee: "KI", due: "Aug 29", priority: "Medium" },
-  { id: 6, title: "Publish staging release", project: "Jojuni Automation", status: "Done", assignee: "AM", due: "Aug 24", priority: "Low" },
-  { id: 7, title: "Update product catalogue import", project: "Meridian Commerce", status: "Review", assignee: "EO", due: "Aug 30", priority: "Medium" },
-];
-
-const initialLedger: LedgerEntry[] = [
-  { id: 1, date: "2025-08-23", description: "Meridian milestone payment", category: "Client income", type: "Income", amount: 2850000 },
-  { id: 2, date: "2025-08-21", description: "AWS cloud infrastructure", category: "Infrastructure", type: "Expense", amount: 186500 },
-  { id: 3, date: "2025-08-19", description: "Northstar discovery deposit", category: "Client income", type: "Income", amount: 1200000 },
-  { id: 4, date: "2025-08-17", description: "Design software licenses", category: "Software", type: "Expense", amount: 97000 },
-  { id: 5, date: "2025-08-14", description: "Contract QA support", category: "Contractors", type: "Expense", amount: 325000 },
-  { id: 6, date: "2025-08-10", description: "Website care retainers", category: "Recurring income", type: "Income", amount: 680000 },
-];
-
-const initialFiles: WorkspaceFile[] = [
-  { name: "Meridian product requirements.pdf", project: "Meridian Commerce", size: "2.8 MB", type: "document", updated: "2 hours ago" },
-  { name: "Northstar onboarding-flow.fig", project: "Northstar Mobile", size: "18.4 MB", type: "image", updated: "Yesterday" },
-  { name: "August delivery tracker.xlsx", project: "Internal", size: "920 KB", type: "sheet", updated: "Yesterday" },
-  { name: "API integration notes.pdf", project: "Meridian Commerce", size: "1.2 MB", type: "document", updated: "Aug 22" },
-  { name: "Research interview summary.docx", project: "Northstar Mobile", size: "640 KB", type: "document", updated: "Aug 20" },
-];
 
 const statuses: TaskStatus[] = ["To do", "In progress", "Review", "Done"];
 
@@ -144,15 +85,32 @@ const fileIcon = (type: WorkspaceFile["type"]) => {
   return File;
 };
 
+/** Turns a `YYYY-MM-DD` form value into the friendly label the board shows. */
+function formatDueLabel(value: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value || "No date";
+  const target = new Date(`${value}T00:00:00`);
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffDays = Math.round((target.getTime() - startOfToday.getTime()) / 86_400_000);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Tomorrow";
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit" }).format(target);
+}
+
 function WorkspaceApp() {
   const [role, setRole] = useState<Role>(() => {
     const stored = localStorage.getItem("jojuni-demo-role");
     return stored === "staff" || stored === "accountant" || stored === "founder" ? stored : "founder";
   });
   const [view, setView] = useState<View>("overview");
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
-  const [ledger, setLedger] = useState<LedgerEntry[]>(initialLedger);
-  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>(initialFiles);
+  const [tasks, setTasks] = useState<Task[]>(seedTasks);
+  const [projects, setProjects] = useState<Project[]>(seedProjects);
+  const [ledger, setLedger] = useState<LedgerEntry[]>(seedLedger);
+  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>(seedFiles);
+  const [messages, setMessages] = useState<WorkspaceMessage[]>(seedMessages);
+  const [dataState, setDataState] = useState<"syncing" | "live" | "demo">("syncing");
+  const [databaseNote, setDatabaseNote] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ text: string; tone: "ok" | "error" } | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [taskModalOpen, setTaskModalOpen] = useState(false);
@@ -199,6 +157,51 @@ function WorkspaceApp() {
     if (view === "finance" && role === "staff") setView("overview");
   }, [role, view]);
 
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(null), 4200);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadWorkspace = async () => {
+      setDataState("syncing");
+      try {
+        const data = await api.workspace(role);
+        if (cancelled) return;
+        setTasks(data.tasks);
+        setProjects(data.projects);
+        setLedger(data.ledger);
+        setWorkspaceFiles(data.files);
+        setMessages(data.messages);
+        setDatabaseNote(null);
+        setDataState("live");
+      } catch (error) {
+        if (cancelled) return;
+        setDataState("demo");
+        setDatabaseNote(error instanceof ApiError ? error.message : "The workspace database could not be reached.");
+      }
+    };
+    void loadWorkspace();
+    return () => {
+      cancelled = true;
+    };
+  }, [role]);
+
+  const reportSaveFailure = (error: unknown) => {
+    if (error instanceof ApiError && error.isDatabaseIssue) {
+      setDataState("demo");
+      setDatabaseNote(error.message);
+      setNotice({ text: "Saved on this device only — the database is unavailable.", tone: "error" });
+      return;
+    }
+    setNotice({
+      text: error instanceof ApiError ? error.message : "That change could not be saved.",
+      tone: "error",
+    });
+  };
+
   const searchResults = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return [];
@@ -214,51 +217,66 @@ function WorkspaceApp() {
     setSearchQuery("");
   };
 
-  const moveTask = (id: number, direction: -1 | 1) => {
-    setTasks((current) => current.map((task) => {
-      if (task.id !== id) return task;
-      const currentIndex = statuses.indexOf(task.status);
-      const nextIndex = Math.max(0, Math.min(statuses.length - 1, currentIndex + direction));
-      return { ...task, status: statuses[nextIndex] };
-    }));
+  const moveTask = (id: string, direction: -1 | 1) => {
+    const current = tasks.find((task) => task.id === id);
+    if (!current) return;
+    const nextIndex = Math.max(0, Math.min(statuses.length - 1, statuses.indexOf(current.status) + direction));
+    const nextStatus = statuses[nextIndex];
+    if (nextStatus === current.status) return;
+    const previous = tasks;
+    setTasks((all) => all.map((task) => (task.id === id ? { ...task, status: nextStatus } : task)));
+    api.tasks.update(id, { status: nextStatus }, role).catch((error) => {
+      setTasks(previous);
+      reportSaveFailure(error);
+    });
   };
 
   const addTask = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    setTasks((current) => [
-      ...current,
-      {
-        id: Date.now(),
-        title: String(form.get("title")),
-        project: String(form.get("project")),
-        status: "To do",
-        assignee: currentPerson.initials,
-        due: String(form.get("due") || "No date"),
-        priority: String(form.get("priority")) as Task["priority"],
-      },
-    ]);
+    const draft: Task = {
+      id: `local-${Date.now()}`,
+      title: String(form.get("title")),
+      project: String(form.get("project")),
+      status: "To do",
+      assignee: currentPerson.initials,
+      due: formatDueLabel(String(form.get("due") || "")),
+      priority: String(form.get("priority")) as Task["priority"],
+    };
+    setTasks((current) => [...current, draft]);
     event.currentTarget.reset();
     setTaskModalOpen(false);
+    api.tasks
+      .create(draft, role)
+      .then(({ task }) => setTasks((current) => current.map((item) => (item.id === draft.id ? task : item))))
+      .catch((error) => {
+        setTasks((current) => current.filter((item) => item.id !== draft.id));
+        reportSaveFailure(error);
+      });
   };
 
   const addTransaction = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canViewFinance) return;
     const form = new FormData(event.currentTarget);
-    setLedger((current) => [
-      {
-        id: Date.now(),
-        date: String(form.get("date")),
-        description: String(form.get("description")),
-        category: String(form.get("category")),
-        type: String(form.get("type")) as TransactionType,
-        amount: Number(form.get("amount")),
-      },
-      ...current,
-    ]);
+    const draft: LedgerEntry = {
+      id: `local-${Date.now()}`,
+      date: String(form.get("date")),
+      description: String(form.get("description")),
+      category: String(form.get("category")),
+      type: String(form.get("type")) as TransactionType,
+      amount: Number(form.get("amount")),
+    };
+    setLedger((current) => [draft, ...current]);
     event.currentTarget.reset();
     setTransactionModalOpen(false);
+    api.ledger
+      .create(draft, role)
+      .then(({ entry }) => setLedger((current) => current.map((item) => (item.id === draft.id ? entry : item))))
+      .catch((error) => {
+        setLedger((current) => current.filter((item) => item.id !== draft.id));
+        reportSaveFailure(error);
+      });
   };
 
   const uploadFile = (event: FormEvent<HTMLInputElement>) => {
@@ -266,11 +284,40 @@ function WorkspaceApp() {
     const selected = input.files?.[0];
     if (!selected) return;
     const type: WorkspaceFile["type"] = selected.type.startsWith("image/") ? "image" : selected.name.endsWith(".xlsx") || selected.name.endsWith(".csv") ? "sheet" : "document";
-    setWorkspaceFiles((current) => [
-      { name: selected.name, project: "Internal", size: `${Math.max(1, Math.round(selected.size / 1024))} KB`, type, updated: "Just now" },
-      ...current,
-    ]);
+    const draft: WorkspaceFile = {
+      id: `local-${Date.now()}`,
+      name: selected.name,
+      project: "Internal",
+      size: `${Math.max(1, Math.round(selected.size / 1024))} KB`,
+      type,
+      updated: "Just now",
+    };
+    setWorkspaceFiles((current) => [draft, ...current]);
     input.value = "";
+    api.files
+      .create(draft)
+      .then(({ file }) => setWorkspaceFiles((current) => current.map((item) => (item.id === draft.id ? file : item))))
+      .catch((error) => {
+        setWorkspaceFiles((current) => current.filter((item) => item.id !== draft.id));
+        reportSaveFailure(error);
+      });
+  };
+
+  const sendMessage = (channel: string, text: string) => {
+    const draft: WorkspaceMessage = {
+      id: `local-${Date.now()}`,
+      channel,
+      name: currentPerson.name,
+      initials: currentPerson.initials,
+      text,
+      time: "Now",
+      createdAt: new Date().toISOString(),
+    };
+    setMessages((current) => [...current, draft]);
+    api.messages
+      .create(draft, role)
+      .then(({ message }) => setMessages((current) => current.map((item) => (item.id === draft.id ? message : item))))
+      .catch(reportSaveFailure);
   };
 
   const exportLedger = () => {
@@ -400,6 +447,19 @@ function WorkspaceApp() {
             )}
           </div>
           <div className="ml-auto flex items-center gap-2">
+            <span
+              title={databaseNote ?? "Workspace data is stored in Neon (PostgreSQL)"}
+              className={`hidden items-center gap-2 border px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em] sm:flex ${
+                dataState === "live"
+                  ? "border-emerald-600/30 bg-emerald-50 text-emerald-700"
+                  : dataState === "syncing"
+                    ? "border-black/10 bg-white text-black/45"
+                    : "border-amber-500/40 bg-amber-50 text-amber-700"
+              }`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${dataState === "live" ? "bg-emerald-600" : dataState === "syncing" ? "animate-pulse bg-black/30" : "bg-amber-500"}`} />
+              {dataState === "live" ? "Synced" : dataState === "syncing" ? "Syncing" : "Demo data"}
+            </span>
             <button className="relative grid h-10 w-10 place-items-center border border-black/10 bg-white" aria-label="Notifications">
               <Bell className="h-4.5 w-4.5" />
               <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[#d90429]" />
@@ -411,12 +471,20 @@ function WorkspaceApp() {
         </header>
 
         <main className="min-h-[calc(100vh-76px)] p-4 sm:p-6 lg:p-8 xl:p-10">
+          {databaseNote && (
+            <div className="mx-auto mb-6 flex max-w-[1500px] items-start gap-3 border border-amber-500/40 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800">
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                <strong>Demo data.</strong> {databaseNote} Changes stay on this device until the Neon database is connected — see <code className="font-semibold">DEPLOYMENT.md</code> for the setup steps.
+              </span>
+            </div>
+          )}
           <AnimatePresence mode="wait">
             <motion.div key={view} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
-              {view === "overview" && <Overview person={currentPerson.name} tasks={tasks} onNavigate={navigate} onNewTask={() => setTaskModalOpen(true)} />}
+              {view === "overview" && <Overview person={currentPerson.name} tasks={tasks} projects={projects} onNavigate={navigate} onNewTask={() => setTaskModalOpen(true)} />}
               {view === "tasks" && <MyWork tasks={tasks} onMoveTask={moveTask} onNewTask={() => setTaskModalOpen(true)} />}
-              {view === "projects" && <ProjectBoard tasks={tasks} onMoveTask={moveTask} onNewTask={() => setTaskModalOpen(true)} />}
-              {view === "messages" && <MessagesView />}
+              {view === "projects" && <ProjectBoard tasks={tasks} projects={projects} onMoveTask={moveTask} onNewTask={() => setTaskModalOpen(true)} />}
+              {view === "messages" && <MessagesView messages={messages} onSend={sendMessage} />}
               {view === "files" && <FilesView files={workspaceFiles} onUpload={() => fileInputRef.current?.click()} />}
               {view === "finance" && canViewFinance && <FinanceView entries={ledger} onNew={() => setTransactionModalOpen(true)} onExport={exportLedger} />}
             </motion.div>
@@ -425,6 +493,19 @@ function WorkspaceApp() {
       </div>
 
       <input ref={fileInputRef} type="file" onChange={uploadFile} className="hidden" />
+
+      <AnimatePresence>
+        {notice && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            className={`fixed bottom-4 right-4 z-[90] max-w-sm border px-4 py-3 text-sm shadow-2xl ${notice.tone === "error" ? "border-[#d90429] bg-[#d90429] text-white" : "border-black bg-black text-white"}`}
+          >
+            {notice.text}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {installVisible && (
@@ -492,7 +573,7 @@ function PageHeading({ eyebrow, title, description, action }: { eyebrow: string;
   );
 }
 
-function Overview({ person, tasks, onNavigate, onNewTask }: { person: string; tasks: Task[]; onNavigate: (view: View) => void; onNewTask: () => void }) {
+function Overview({ person, tasks, projects, onNavigate, onNewTask }: { person: string; tasks: Task[]; projects: Project[]; onNavigate: (view: View) => void; onNewTask: () => void }) {
   const firstName = person.split(" ")[0];
   const taskCounts = {
     mine: tasks.filter((task) => task.assignee === "AM" || task.assignee === "KI").length,
@@ -566,7 +647,7 @@ function Overview({ person, tasks, onNavigate, onNewTask }: { person: string; ta
   );
 }
 
-function MyWork({ tasks, onMoveTask, onNewTask }: { tasks: Task[]; onMoveTask: (id: number, direction: -1 | 1) => void; onNewTask: () => void }) {
+function MyWork({ tasks, onMoveTask, onNewTask }: { tasks: Task[]; onMoveTask: (id: string, direction: -1 | 1) => void; onNewTask: () => void }) {
   const [filter, setFilter] = useState<"All" | TaskStatus>("All");
   const visible = filter === "All" ? tasks : tasks.filter((task) => task.status === filter);
 
@@ -586,7 +667,7 @@ function MyWork({ tasks, onMoveTask, onNewTask }: { tasks: Task[]; onMoveTask: (
   );
 }
 
-function TaskRow({ task, onMoveTask }: { task: Task; onMoveTask: (id: number, direction: -1 | 1) => void }) {
+function TaskRow({ task, onMoveTask }: { task: Task; onMoveTask: (id: string, direction: -1 | 1) => void }) {
   return (
     <div className="grid gap-4 border-b border-black/15 py-5 sm:grid-cols-[1fr_135px_100px] sm:items-center">
       <div className="flex items-start gap-3">
@@ -605,13 +686,13 @@ function TaskRow({ task, onMoveTask }: { task: Task; onMoveTask: (id: number, di
   );
 }
 
-function ProjectBoard({ tasks, onMoveTask, onNewTask }: { tasks: Task[]; onMoveTask: (id: number, direction: -1 | 1) => void; onNewTask: () => void }) {
+function ProjectBoard({ tasks, projects, onMoveTask, onNewTask }: { tasks: Task[]; projects: Project[]; onMoveTask: (id: string, direction: -1 | 1) => void; onNewTask: () => void }) {
   return (
     <div className="mx-auto max-w-[1500px]">
       <PageHeading eyebrow="Shared delivery" title="Project board" description="Move work through the delivery pipeline and keep every handoff visible." action={<button onClick={onNewTask} className="flex items-center gap-2 bg-[#d90429] px-4 py-3 text-sm font-semibold text-white"><Plus className="h-4 w-4" /> Add task</button>} />
       <div className="mb-6 flex items-center justify-between border-y border-black/10 py-4">
         <div><p className="font-semibold">Meridian Commerce</p><p className="mt-1 text-xs text-black/45">Web development / 72% complete</p></div>
-        <div className="hidden -space-x-2 sm:flex">{projects[0].members.map((member, index) => <span key={member} className={`grid h-8 w-8 place-items-center border-2 border-[#f6f6f3] text-[10px] font-bold text-white ${index === 0 ? "bg-[#d90429]" : "bg-black"}`}>{member}</span>)}</div>
+        <div className="hidden -space-x-2 sm:flex">{(projects[0]?.members ?? []).map((member, index) => <span key={member} className={`grid h-8 w-8 place-items-center border-2 border-[#f6f6f3] text-[10px] font-bold text-white ${index === 0 ? "bg-[#d90429]" : "bg-black"}`}>{member}</span>)}</div>
       </div>
       <div className="grid gap-4 overflow-x-auto pb-4 md:grid-cols-2 xl:grid-cols-4">
         {statuses.map((status) => {
@@ -641,18 +722,24 @@ function ProjectBoard({ tasks, onMoveTask, onNewTask }: { tasks: Task[]; onMoveT
   );
 }
 
-function MessagesView() {
-  const [messages, setMessages] = useState([
-    { name: "Ada Madu", initials: "AM", text: "The client approved the updated checkout direction. Let us move the remaining states into review today.", time: "9:14 AM" },
-    { name: "Kene Ibe", initials: "KI", text: "Perfect. I have the error states open now and will share the prototype link before lunch.", time: "9:21 AM" },
-    { name: "Bola Nnaji", initials: "BN", text: "Webhook testing is also complete on staging. I added the edge cases to the release notes.", time: "9:37 AM" },
-  ]);
+function MessagesView({ messages, onSend }: { messages: WorkspaceMessage[]; onSend: (channel: string, text: string) => void }) {
+  const channels = useMemo(() => {
+    const known = new Set<string>(workspaceChannels);
+    for (const message of messages) known.add(message.channel);
+    return [...known];
+  }, [messages]);
+  const [activeChannel, setActiveChannel] = useState(channels[0] ?? "General");
   const [draft, setDraft] = useState("");
+
+  const channelMessages = useMemo(
+    () => messages.filter((message) => message.channel === activeChannel),
+    [messages, activeChannel],
+  );
 
   const sendMessage = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!draft.trim()) return;
-    setMessages((current) => [...current, { name: "Ada Madu", initials: "AM", text: draft.trim(), time: "Now" }]);
+    onSend(activeChannel, draft.trim());
     setDraft("");
   };
 
@@ -662,25 +749,29 @@ function MessagesView() {
       <div className="grid min-h-[620px] border border-black/15 bg-white md:grid-cols-[250px_1fr]">
         <aside className="border-b border-black/10 p-4 md:border-b-0 md:border-r">
           <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.15em] text-black/35">Project channels</p>
-          {[
-              ["Meridian Commerce", "3", true],
-            ["Northstar Mobile", "", false],
-            ["Jojuni Automation", "", false],
-            ["General", "", false],
-          ].map(([name, unread, active]) => (
-            <button key={String(name)} className={`mb-1 flex w-full items-center gap-2 px-3 py-3 text-left text-sm font-medium ${active ? "bg-black text-white" : "text-black/55 hover:bg-black/5"}`}><span className="text-black/30">#</span>{String(name)}{unread && <span className="ml-auto grid h-5 w-5 place-items-center bg-[#d90429] text-[9px] font-bold text-white">{String(unread)}</span>}</button>
-          ))}
+          {channels.map((channel) => {
+            const count = messages.filter((message) => message.channel === channel).length;
+            const active = channel === activeChannel;
+            return (
+              <button key={channel} onClick={() => setActiveChannel(channel)} className={`mb-1 flex w-full items-center gap-2 px-3 py-3 text-left text-sm font-medium ${active ? "bg-black text-white" : "text-black/55 hover:bg-black/5"}`}>
+                <span className="text-black/30">#</span>
+                <span className="truncate">{channel}</span>
+                {count > 0 && <span className={`ml-auto grid h-5 min-w-5 place-items-center px-1 text-[9px] font-bold ${active ? "bg-white text-black" : "bg-black/10 text-black/60"}`}>{count}</span>}
+              </button>
+            );
+          })}
         </aside>
         <section className="flex min-h-[540px] flex-col">
-          <div className="flex items-center justify-between border-b border-black/10 px-5 py-4"><div><h2 className="font-semibold">Meridian Commerce</h2><p className="mt-1 text-xs text-black/40">12 members / Client delivery</p></div><MoreHorizontal className="h-5 w-5 text-black/35" /></div>
+          <div className="flex items-center justify-between border-b border-black/10 px-5 py-4"><div><h2 className="font-semibold">{activeChannel}</h2><p className="mt-1 text-xs text-black/40">{channelMessages.length} message{channelMessages.length === 1 ? "" : "s"} / Client delivery</p></div><MoreHorizontal className="h-5 w-5 text-black/30" /></div>
           <div className="flex-1 space-y-7 overflow-y-auto p-5 sm:p-7">
             <p className="text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-black/35">Today</p>
-            {messages.map((message, index) => (
-              <motion.div initial={index === messages.length - 1 && message.time === "Now" ? { opacity: 0, y: 8 } : false} animate={{ opacity: 1, y: 0 }} key={`${message.time}-${index}`} className="flex gap-3">
-                <span className={`grid h-9 w-9 shrink-0 place-items-center text-[10px] font-bold text-white ${message.initials === "AM" ? "bg-[#d90429]" : "bg-black"}`}>{message.initials}</span>
+            {channelMessages.map((message, index) => (
+              <motion.div initial={index === channelMessages.length - 1 && message.time === "Now" ? { opacity: 0, y: 8 } : false} animate={{ opacity: 1, y: 0 }} key={message.id} className="flex gap-3">
+                <span className={`grid h-9 w-9 shrink-0 place-items-center text-[10px] font-bold text-white ${message.initials === "AM" ? "bg-[#d90429]" : "bg-black"}`}>{message.initials || message.name.slice(0, 2).toUpperCase()}</span>
                 <div><p className="text-sm font-semibold">{message.name} <span className="ml-2 text-[10px] font-normal text-black/35">{message.time}</span></p><p className="mt-2 max-w-2xl text-sm leading-relaxed text-black/65">{message.text}</p></div>
               </motion.div>
             ))}
+            {!channelMessages.length && <p className="py-16 text-center text-sm text-black/40">No messages in this channel yet.</p>}
           </div>
           <form onSubmit={sendMessage} className="m-4 flex items-end gap-2 border border-black/20 p-2 sm:m-5">
             <button type="button" className="grid h-10 w-10 shrink-0 place-items-center text-black/40" aria-label="Attach file"><Paperclip className="h-4 w-4" /></button>
