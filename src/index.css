@@ -78,6 +78,14 @@ button:disabled {
   transform-origin: left;
 }
 
+.nav-link-active {
+  color: #ffffff;
+}
+
+.nav-link-active::after {
+  transform: scaleX(1);
+}
+
 .section-kicker {
   font-size: 0.72rem;
   font-weight: 800;

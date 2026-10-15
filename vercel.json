@@ -6,7 +6,14 @@
   "regions": ["lhr1"],
   "rewrites": [
     { "source": "/workspace", "destination": "/index.html" },
-    { "source": "/workspace/:path*", "destination": "/index.html" }
+    { "source": "/workspace/:path*", "destination": "/index.html" },
+    { "source": "/about", "destination": "/index.html" },
+    { "source": "/services", "destination": "/index.html" },
+    { "source": "/portfolio", "destination": "/index.html" },
+    { "source": "/blog", "destination": "/index.html" },
+    { "source": "/blog/:slug", "destination": "/index.html" },
+    { "source": "/contact", "destination": "/index.html" },
+    { "source": "/:path*", "destination": "/index.html" }
   ],
   "headers": [
     {
