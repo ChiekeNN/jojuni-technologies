@@ -17,6 +17,8 @@ import { Pool } from "@neondatabase/serverless";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const command = process.argv[2];
+/** `--optional`: exit 0 (skip) instead of failing when DATABASE_URL is absent. */
+const optional = process.argv.includes("--optional");
 
 function loadEnvFile() {
   for (const name of [".env.local", ".env"]) {
@@ -36,6 +38,10 @@ function loadEnvFile() {
 function connectionString() {
   const url = process.env.DIRECT_DATABASE_URL || process.env.DATABASE_URL;
   if (!url) {
+    if (optional) {
+      console.log("• DATABASE_URL not set — skipping database step.");
+      process.exit(0);
+    }
     console.error(
       [
         "",

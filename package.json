@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "prebuild": "node scripts/db.mjs migrate --optional || echo '[prebuild] migration skipped or failed - deploying anyway'",
     "dev": "vite",
     "dev:api": "tsx scripts/dev-api.mjs",
     "dev:stack": "node scripts/dev-stack.mjs",
