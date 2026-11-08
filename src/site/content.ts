@@ -342,12 +342,21 @@ export const testimonials: { quote: string; name: string; role: string }[] = [
 ];
 
 export const contactInfo = {
-  // TODO: replace with the company's real phone number and street address.
-  email: "hello@jojuni.tech",
-  phone: "+234 803 000 0000",
-  office: "Yaba, Lagos, Nigeria",
+  email: "hello@jojunitechnologies.com.ng",
+  phone: "08059363013",
+  office: "1, Mpi Avenue, off Chinda Road, off Ada George Road, Port Harcourt, Rivers State, Nigeria",
   hours: "Monday – Friday, 9:00 – 18:00 WAT",
 };
+
+/**
+ * Builds the `tel:` target. Numbers stored in local Nigerian form (leading 0)
+ * are converted to the +234 country code so the link dials correctly from
+ * outside the country; anything already international is passed through.
+ */
+export function telHref(phone: string = contactInfo.phone): string {
+  const digits = phone.replace(/[^\d+]/g, "");
+  return digits.startsWith("0") ? `+234${digits.slice(1)}` : digits;
+}
 
 export const navItems: { label: string; to: string }[] = [
   { label: "Home", to: "/" },

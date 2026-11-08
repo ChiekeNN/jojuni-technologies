@@ -1,6 +1,7 @@
 import { ArrowRight, Check } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { ApiError, api } from "../lib/api";
+import { contactInfo } from "./content";
 
 /**
  * The public "project brief" form. Submissions are stored in Neon (`leads`).
@@ -29,8 +30,8 @@ export function ContactForm() {
     } catch (error) {
       setSubmitError(
         error instanceof ApiError
-          ? `${error.message} Try again, or email hello@jojuni.tech directly.`
-          : "Something went wrong sending your brief. Try again, or email hello@jojuni.tech directly.",
+          ? `${error.message} Try again, or email ${contactInfo.email} directly.`
+          : `Something went wrong sending your brief. Try again, or email ${contactInfo.email} directly.`,
       );
       setSubmitState("error");
     }

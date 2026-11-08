@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowUpRight, Mail, MapPin, Menu, Phone, Clock3, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { contactInfo, navItems } from "./content";
+import { contactInfo, navItems, telHref } from "./content";
 import { SiteLink, useRouter } from "./router";
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -87,7 +87,7 @@ export function Layout({ children }: { children: ReactNode }) {
               <p className="mb-5 text-xs font-bold uppercase tracking-[0.2em] text-white/40">Contact</p>
               <div className="space-y-4 text-sm text-white/70">
                 <a href={`mailto:${contactInfo.email}`} className="flex items-center gap-3 hover:text-[#d90429]"><Mail className="h-4 w-4 shrink-0" /> {contactInfo.email}</a>
-                <a href={`tel:${contactInfo.phone.replace(/\s/g, "")}`} className="flex items-center gap-3 hover:text-[#d90429]"><Phone className="h-4 w-4 shrink-0" /> {contactInfo.phone}</a>
+                <a href={`tel:${telHref()}`} className="flex items-center gap-3 hover:text-[#d90429]"><Phone className="h-4 w-4 shrink-0" /> {contactInfo.phone}</a>
                 <p className="flex items-center gap-3"><MapPin className="h-4 w-4 shrink-0" /> {contactInfo.office}</p>
                 <p className="flex items-center gap-3"><Clock3 className="h-4 w-4 shrink-0" /> {contactInfo.hours}</p>
               </div>

@@ -2,7 +2,7 @@ import { Clock3, Mail, MapPin, Phone } from "lucide-react";
 import { useEffect } from "react";
 import { PageHero } from "../Layout";
 import { ContactForm } from "../ContactForm";
-import { contactInfo } from "../content";
+import { contactInfo, telHref } from "../content";
 
 export function ContactPage() {
   useEffect(() => {
@@ -29,7 +29,7 @@ export function ContactPage() {
                   <span className="grid h-11 w-11 shrink-0 place-items-center bg-black text-white"><Mail className="h-5 w-5" /></span>
                   {contactInfo.email}
                 </a>
-                <a href={`tel:${contactInfo.phone.replace(/\s/g, "")}`} className="flex items-center gap-4 font-semibold hover:text-[#d90429]">
+                <a href={`tel:${telHref()}`} className="flex items-center gap-4 font-semibold hover:text-[#d90429]">
                   <span className="grid h-11 w-11 shrink-0 place-items-center bg-black text-white"><Phone className="h-5 w-5" /></span>
                   {contactInfo.phone}
                 </a>
