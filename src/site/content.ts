@@ -185,6 +185,20 @@ export type CaseStudyMedia = {
 
 export const caseStudies: CaseStudy[] = [
   {
+    name: "Get A Job App",
+    client: "Get A Job",
+    sector: "Employment & recruitment",
+    year: "2026",
+    summary:
+      "A job search app built for the Nigerian market: one place to find vacancy listings across the country, apply from a phone without a laptop, and keep track of every application in one dashboard.",
+    outcomes: [
+      "Nationwide job search in one place instead of scattered listings",
+      "Applications tracked in a single dashboard",
+      "Built to work on the phones most job seekers actually own",
+    ],
+    tags: ["Mobile App", "Web Portal", "Search"],
+  },
+  {
     name: "Meridian Commerce",
     client: "Meridian Retail",
     sector: "Retail & e-commerce",
