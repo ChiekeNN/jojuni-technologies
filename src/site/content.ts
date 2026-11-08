@@ -124,7 +124,7 @@ export const services: Service[] = [
 ];
 
 export const stats: [string, string][] = [
-  ["40+", "projects delivered"],
+  ["482+", "projects delivered"],
   ["12", "industries served"],
   ["98%", "clients who stay with us"],
   ["24/7", "support & monitoring"],
