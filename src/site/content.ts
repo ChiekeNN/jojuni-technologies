@@ -159,6 +159,28 @@ export type CaseStudy = {
   summary: string;
   outcomes: string[];
   tags: string[];
+  /**
+   * Optional hero visual. Drop a file into `public/images/work/` and point at it
+   * with an absolute public path, e.g. "/images/work/meridian-commerce.jpg".
+   * Cases without a `media` entry simply render the text-only layout, so the
+   * page stays consistent while more visuals are cleared for publication.
+   *
+   * Aspect ratio is fixed at 16:10 by the renderer; supply larger than
+   * 1600x1000 and keep important UI away from the outer edges.
+   */
+  media?: CaseStudyMedia;
+  /** Optional public link to the live product. */
+  demoUrl?: string;
+};
+
+export type CaseStudyMedia = {
+  src: string;
+  /** Describe what the interface shows — read by screen readers and shown as a caption. */
+  alt: string;
+  /** What kind of surface this is, used for the frame chrome. */
+  kind: "browser" | "phone" | "app";
+  /** Optional short caption rendered under the visual. */
+  caption?: string;
 };
 
 export const caseStudies: CaseStudy[] = [
@@ -188,6 +210,13 @@ export const caseStudies: CaseStudy[] = [
     summary: "Our own delivery workspace: project boards, client files, and reporting in one place, replacing spreadsheets and chat-thread project management.",
     outcomes: ["Weekly reporting time cut by 70%", "One source of truth across three teams", "Faster client onboarding with checklists built in"],
     tags: ["Business Automation", "Custom Tools", "Data Reports"],
+    media: {
+      src: "/images/work/workspace-overview.png",
+      alt: "The Jojuni workspace overview: assigned task counts, active project progress bars, and a live activity feed.",
+      kind: "app",
+      caption: "The workspace overview the team opens every morning.",
+    },
+    // Internal tool — no public URL to link to, so no demoUrl.
   },
   {
     name: "Lagoon Foods",
