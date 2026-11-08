@@ -1,8 +1,17 @@
-import { Check } from "lucide-react";
+import { ArrowUpRight, Check } from "lucide-react";
 import { useEffect } from "react";
 import { CtaBand, PageHero } from "../Layout";
 import { CaseStudyMedia } from "../CaseStudyMedia";
 import { caseStudies } from "../content";
+
+/** Trim a URL down to a readable domain for link text. */
+function safeHostLabel(url: string): string {
+  try {
+    return new URL(url.startsWith("http") ? url : `https://${url}`).host.replace(/^www\./, "");
+  } catch {
+    return "the live site";
+  }
+}
 
 export function PortfolioPage() {
   useEffect(() => {
@@ -45,6 +54,18 @@ export function PortfolioPage() {
                   <div className="mt-10">
                     <CaseStudyMedia media={study.media} demoUrl={study.demoUrl} />
                   </div>
+                ) : study.demoUrl ? (
+                  /* No screenshot yet, but the product is public — the link is
+                     proof enough on its own and shouldn't wait on a visual. */
+                  <a
+                    href={study.demoUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="group mt-9 inline-flex items-center gap-2 border border-black px-5 py-3 text-sm font-semibold transition hover:bg-black hover:text-white"
+                  >
+                    Visit {safeHostLabel(study.demoUrl)}
+                    <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                  </a>
                 ) : null}
               </div>
 

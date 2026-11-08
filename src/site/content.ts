@@ -199,6 +199,21 @@ export const caseStudies: CaseStudy[] = [
     tags: ["Mobile App", "Web Portal", "Search"],
   },
   {
+    name: "MyDoc247",
+    client: "MyDoc247",
+    sector: "Healthcare & telemedicine",
+    year: "2026",
+    summary:
+      "A telemedicine marketplace on the model of a ride-hailing app, pointed at doctors instead of drivers: clinicians publish their own specialties, availability and fees, and patients book whichever one fits — then consult by chat, voice or video without leaving the app.",
+    outcomes: [
+      "Doctors set their own availability, specialties and fees",
+      "Patients match on specialty, language and price",
+      "Chat, voice and video consultations in one app",
+    ],
+    tags: ["Telemedicine", "Marketplace", "Mobile App"],
+    demoUrl: "https://mydoctor247.com.ng",
+  },
+  {
     name: "Meridian Commerce",
     client: "Meridian Retail",
     sector: "Retail & e-commerce",
