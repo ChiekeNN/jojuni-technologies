@@ -117,8 +117,8 @@ export function HomePage() {
               View the portfolio <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </SiteLink>
           </div>
-          <div className="mt-14 grid gap-10 lg:grid-cols-3">
-            {caseStudies.slice(0, 3).map((study) => (
+          <div className="mt-14 grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+            {caseStudies.slice(0, 4).map((study) => (
               <SiteLink key={study.name} to="/portfolio" className="group border-t-2 border-black pt-6">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-black/40">{study.sector} / {study.year}</p>
                 <h3 className="mt-4 text-2xl font-semibold tracking-[-0.03em] group-hover:text-[#d90429]">{study.name}</h3>
