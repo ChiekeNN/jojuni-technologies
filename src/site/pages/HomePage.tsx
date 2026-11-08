@@ -80,8 +80,10 @@ export function HomePage() {
               </h2>
             </div>
           </div>
-          <div className="mt-14 grid gap-px bg-black/15 sm:grid-cols-2 lg:grid-cols-3">
-            {services.slice(0, 6).map((service) => {
+          {/* 10 services — column counts chosen so the last row is never ragged
+              (the grid's gap colour shows through any empty cell). */}
+          <div className="mt-14 grid gap-px bg-black/15 sm:grid-cols-2 lg:grid-cols-5">
+            {services.map((service) => {
               const Icon = service.icon;
               return (
                 <SiteLink key={service.title} to="/services" className="group bg-[#f4f2ed] p-7 transition hover:bg-white sm:p-9">
@@ -97,7 +99,7 @@ export function HomePage() {
           </div>
           <div className="mt-10">
             <SiteLink to="/services" className="group inline-flex items-center gap-3 border border-black px-6 py-4 font-semibold transition hover:bg-black hover:text-white">
-              See all ten service areas
+              Explore each service in detail
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </SiteLink>
           </div>
