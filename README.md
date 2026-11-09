@@ -13,6 +13,8 @@ Deployed on **Vercel** (static frontend + serverless API) with **Neon** (serverl
 ## What the database stores
 
 - **Leads** — every "Send project brief" submission from the public contact form (`leads` table).
+  Each submission also emails the team inbox and sends the visitor a confirmation
+  (see *Email* below).
 - **Workspace data** — tasks, projects, the finance ledger, shared file metadata and channel messages (`tasks`, `projects`, `ledger_entries`, `workspace_files`, `workspace_messages`).
 
 The workspace UI always renders immediately from local seed data and then swaps in
@@ -55,7 +57,7 @@ All endpoints are JSON. Errors return `{ "error": "<code>", "message": "...", "h
 | Method & path | Purpose |
 | --- | --- |
 | `GET /api/health` | Service + database diagnostics (never throws) |
-| `POST /api/leads` | Public contact form. Hidden `website` field is a honeypot |
+| `POST /api/leads` | Public contact form. Stores the lead, notifies the team inbox, sends a visitor acknowledgement. Hidden `website` field is a honeypot |
 | `GET /api/leads?limit=50` | Lead export. Requires `x-admin-key: $ADMIN_API_KEY` |
 | `GET /api/workspace` | Full snapshot. Ledger only for founder/accountant |
 | `GET/POST/PATCH/DELETE /api/workspace/tasks` | Task CRUD |
@@ -78,6 +80,9 @@ the Vercel ↔ Neon integration can inject `DATABASE_URL` for you as well.
 | `DATABASE_URL` | yes | Neon **pooled** connection string |
 | `DIRECT_DATABASE_URL` | no | Preferred by migrations when present |
 | `ADMIN_API_KEY` | recommended | Protects `GET /api/leads` |
+| `RESEND_API_KEY` | for email | Sends brief notifications + acknowledgements via Resend |
+| `LEAD_NOTIFY_TO` | optional | Inbox for new briefs (default `contactform@jojunitechnologies.com.ng`) |
+| `LEAD_FROM_EMAIL` | optional | Verified sender address |
 | `DEV_API_PORT` | no | Local API port (default 3000) |
 
 ## Deploying
