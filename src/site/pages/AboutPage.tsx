@@ -21,7 +21,7 @@ export function AboutPage() {
             <p className="section-kicker">Our story</p>
             <div className="mt-8 space-y-6 text-lg leading-relaxed text-black/65">
               <p>
-                Jojuni began as a two-person consultancy fixing other people's abandoned websites — expired certificates, broken checkouts, code nobody understood. The same story repeated so often that we decided to build a company where that story could not happen: every project documented, every system maintainable, every handover complete.
+                Jojuni began as a solo technical consultancy fixing other people's abandoned systems — expired certificates, broken checkout pipelines, and legacy code left behind without documentation. The same scenario repeated so often that I founded Jojuni to set a higher engineering standard: every project strictly documented, every architecture maintainable, and every client handover complete.
               </p>
               <p>
                 Today we are a multidisciplinary team of engineers, designers, and operators delivering websites, mobile apps, cloud infrastructure, and automation for companies across retail, health, education, and logistics.
