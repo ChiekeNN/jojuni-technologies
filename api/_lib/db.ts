@@ -13,6 +13,9 @@ export class DatabaseError extends Error {
   }
 }
 
+/** Ceiling on a single database round trip. */
+const QUERY_TIMEOUT_MS = 8000;
+
 let client: ReturnType<typeof neon> | null = null;
 
 /**
@@ -29,7 +32,14 @@ export function getSql() {
       "Add the Neon pooled connection string as DATABASE_URL in Vercel project settings (or .env locally), then run: npm run db:migrate",
     );
   }
-  if (!client) client = neon(url);
+  if (!client) {
+    client = neon(url, {
+      // Bound every query. The Neon HTTP driver otherwise waits indefinitely,
+      // and a stalled request turns a recoverable lead into a platform-level
+      // 500 with no JSON body.
+      fetchOptions: { signal: AbortSignal.timeout(QUERY_TIMEOUT_MS) },
+    });
+  }
   return client;
 }
 

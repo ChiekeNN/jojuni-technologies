@@ -56,8 +56,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       headers: headerRecord,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
-  } catch {
-    throw new ApiError(0, "network_error", "The API could not be reached.");
+  } catch (error) {
+    // AbortError/timeout surfaces here too; keep the distinction visible.
+    const detail = error instanceof Error ? error.message : "";
+    throw new ApiError(0, "network_error", `The API could not be reached${detail ? ` (${detail})` : ""}.`);
   }
 
   const payload = (await response.json().catch(() => null)) as (ApiErrorBody & Record<string, unknown>) | null;
@@ -66,8 +68,12 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     throw new ApiError(
       response.status,
       payload?.error ?? "internal_error",
-      payload?.message ?? `Request to ${path} failed with status ${response.status}.`,
-      payload?.hint,
+      payload?.message ??
+        `The server could not complete this request (error ${response.status}).`,
+      payload?.hint ??
+        (payload === null
+          ? "The API returned an empty response, which usually means the function crashed or timed out."
+          : undefined),
     );
   }
   return payload as T;
