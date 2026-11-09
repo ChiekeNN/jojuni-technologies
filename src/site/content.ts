@@ -145,10 +145,10 @@ export const values: { title: string; description: string }[] = [
 ];
 
 export const team: { name: string; role: string; initials: string; bio: string }[] = [
-  { name: "Ada Madu", role: "Founder & Chief Executive", initials: "AM", bio: "Started Jojuni after years of watching ambitious Nigerian businesses lose money to software that did not fit. Leads strategy and client partnerships." },
+  { name: "Chieke Nwanna-Nzewunwa", role: "Founder & Chief Executive", initials: "CN", bio: "Founded Jojuni after years of watching ambitious Nigerian businesses lose money to software that did not fit. Leads strategy, engineering standards, and client partnerships." },
+  { name: "Deborah Nwanna-Nzewunwa", role: "Co-Founder & Chief Operating Officer", initials: "DN", bio: "Runs the operating side of the business: delivery schedules, budgets, contracts, and the internal discipline that lets the team focus on the work." },
   { name: "Bola Nnaji", role: "Lead Engineer", initials: "BN", bio: "Owns architecture and delivery across web, mobile, and cloud. Obsessive about performance budgets and clean handovers." },
   { name: "Kene Ibe", role: "Head of Product Design", initials: "KI", bio: "Turns complicated workflows into interfaces people use without training. Runs research and usability testing on every engagement." },
-  { name: "Emeka Obi", role: "Finance & Operations", initials: "EO", bio: "Keeps projects commercially honest — budgets, contracts, and the paperwork that lets the team focus on the work." },
 ];
 
 export type CaseStudy = {
