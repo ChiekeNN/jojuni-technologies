@@ -11,7 +11,7 @@ export function AboutPage() {
     <>
       <PageHero
         kicker="About us"
-        title="A Lagos technology company built on plain language and kept promises."
+        title="A Nigerian technology company built on plain language and kept promises."
         intro="Jojuni Technologies exists because too many ambitious businesses were sold software they could not use, maintain, or explain. We do the opposite: clear scope, dependable delivery, and systems your team actually owns."
       />
 
