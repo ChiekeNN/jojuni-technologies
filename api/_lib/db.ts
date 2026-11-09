@@ -47,6 +47,11 @@ export const EXPECTED_TABLES = [
  * Runs a parameterised query against Neon and maps failures onto the small
  * set of API error codes the frontend understands.
  */
+/** True when a database is configured at all. Lets callers degrade gracefully. */
+export function isDatabaseConfigured(): boolean {
+  return Boolean(process.env.DATABASE_URL);
+}
+
 export async function query<T = Record<string, unknown>>(
   text: string,
   params: unknown[] = [],
