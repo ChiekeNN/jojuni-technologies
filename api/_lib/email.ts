@@ -59,6 +59,14 @@ function paragraphs(value: string): string {
     .join("");
 }
 
+/**
+ * Hard ceiling on a single send. Without this, a provider that accepts the
+ * connection and then stalls leaves the serverless function waiting until the
+ * platform kills it — which surfaces to the visitor as a 500 with no JSON body
+ * and loses the lead entirely.
+ */
+const SEND_TIMEOUT_MS = 8000;
+
 async function send(payload: {
   to: string;
   subject: string;
@@ -68,9 +76,13 @@ async function send(payload: {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   if (!apiKey) return { sent: false, reason: "not_configured" };
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
+
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
+      signal: controller.signal,
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
@@ -93,9 +105,12 @@ async function send(payload: {
     }
     return { sent: true };
   } catch (error) {
+    const timedOut = error instanceof Error && error.name === "AbortError";
     // eslint-disable-next-line no-console
-    console.error("[email] send failed:", error);
-    return { sent: false, reason: "provider_error" };
+    console.error(timedOut ? "[email] send timed out" : "[email] send failed:", timedOut ? "" : error);
+    return { sent: false, reason: "provider_error", detail: timedOut ? "timeout" : undefined };
+  } finally {
+    clearTimeout(timer);
   }
 }
 

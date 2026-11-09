@@ -56,6 +56,15 @@ export default withApiHandler(async (req: ApiRequest, res: ApiResponse) => {
     return;
   }
 
+  // Entry breadcrumb: if the platform ever kills this function mid-flight, the
+  // last log line tells us which stage it died in.
+  // eslint-disable-next-line no-console
+  console.log("[leads] POST received", {
+    dbConfigured: isDatabaseConfigured(),
+    emailConfigured: Boolean(process.env.RESEND_API_KEY),
+    notifyTo: process.env.LEAD_NOTIFY_TO ?? "(default)",
+  });
+
   const body = await readJsonBody(req);
 
   // Honeypot: pretend success, store nothing.
@@ -97,6 +106,9 @@ export default withApiHandler(async (req: ApiRequest, res: ApiResponse) => {
     sendLeadNotification(lead),
     sendLeadAcknowledgement(lead),
   ]);
+
+  // eslint-disable-next-line no-console
+  console.log("[leads] done", { stored, notified: team.sent, acknowledged: acknowledgement.sent });
 
   // If we neither stored nor notified anyone, the submission really is lost and
   // the visitor must be told rather than shown a false success.
