@@ -10,12 +10,16 @@ import {
 } from "../_lib/http";
 import { mapMessage, type MessageRow } from "../_lib/mappers";
 import { asOptionalString, asString, timeLabel } from "../_lib/validation";
+import { requireWorkspaceSession } from "../_lib/roles";
 
 const COLUMNS = "id, channel, name, initials, text, time_label, created_at";
 const SELECT = `select ${COLUMNS} from public.workspace_messages`;
 
 /** GET | POST | DELETE /api/workspace/messages */
 export default withApiHandler(async (req: ApiRequest, res: ApiResponse) => {
+  // Super-admin only: no valid session means no workspace data.
+  await requireWorkspaceSession(req);
+
   const method = (req.method ?? "").toUpperCase();
 
   if (method === "GET") {

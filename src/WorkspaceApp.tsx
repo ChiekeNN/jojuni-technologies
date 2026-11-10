@@ -4,7 +4,6 @@ import {
   ArrowRight,
   Bell,
   CalendarDays,
-  Check,
   CheckSquare2,
   ChevronDown,
   Clock3,
@@ -17,6 +16,7 @@ import {
   Landmark,
   LayoutDashboard,
   LockKeyhole,
+  LogOut,
   Menu,
   MessageCircle,
   MonitorDown,
@@ -30,7 +30,6 @@ import {
   TrendingDown,
   TrendingUp,
   Upload,
-  UserRound,
   WalletCards,
   X,
   type LucideIcon,
@@ -97,11 +96,20 @@ function formatDueLabel(value: string): string {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit" }).format(target);
 }
 
-function WorkspaceApp() {
-  const [role, setRole] = useState<Role>(() => {
-    const stored = localStorage.getItem("jojuni-demo-role");
-    return stored === "staff" || stored === "accountant" || stored === "founder" ? stored : "founder";
-  });
+interface WorkspaceAppProps {
+  /** Clears the server session, then returns the browser to the sign-in screen. */
+  onSignOut: () => void;
+  /** Called when the API reports the session is gone so the gate can re-check. */
+  onSessionExpired: () => void;
+}
+
+function WorkspaceApp({ onSignOut, onSessionExpired }: WorkspaceAppProps) {
+  /**
+   * The role is no longer chosen in the UI. `/workspace` is super-admin only,
+   * so the signed-in owner always acts as the founder; the server decides what
+   * that role may read (see requireWorkspaceSession / requireFinanceRole).
+   */
+  const role: Role = "founder";
   const [view, setView] = useState<View>("overview");
   const [tasks, setTasks] = useState<Task[]>(seedTasks);
   const [projects, setProjects] = useState<Project[]>(seedProjects);
@@ -153,11 +161,6 @@ function WorkspaceApp() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("jojuni-demo-role", role);
-    if (view === "finance" && role === "staff") setView("overview");
-  }, [role, view]);
-
-  useEffect(() => {
     if (!notice) return;
     const timer = window.setTimeout(() => setNotice(null), 4200);
     return () => window.clearTimeout(timer);
@@ -179,6 +182,10 @@ function WorkspaceApp() {
         setDataState("live");
       } catch (error) {
         if (cancelled) return;
+        if (error instanceof ApiError && error.status === 401) {
+          onSessionExpired();
+          return;
+        }
         setDataState("demo");
         setDatabaseNote(error instanceof ApiError ? error.message : "The workspace database could not be reached.");
       }
@@ -414,14 +421,21 @@ function WorkspaceApp() {
             {accountMenuOpen && (
               <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                 <div className="mt-1 border border-white/15 p-2">
-                  <p className="px-2 pb-2 pt-1 text-[10px] uppercase tracking-[0.14em] text-white/35">Demo as</p>
-                  {(Object.keys(people) as Role[]).map((roleOption) => (
-                    <button key={roleOption} onClick={() => { setRole(roleOption); setAccountMenuOpen(false); }} className={`flex w-full items-center gap-2 px-2 py-2 text-xs capitalize ${role === roleOption ? "bg-white text-black" : "text-white/60 hover:text-white"}`}>
-                      <UserRound className="h-3.5 w-3.5" />
-                      {roleOption}
-                      {role === roleOption && <Check className="ml-auto h-3.5 w-3.5" />}
-                    </button>
-                  ))}
+                  <p className="px-2 pb-2 pt-1 text-[10px] uppercase tracking-[0.14em] text-white/35">Super admin</p>
+                  <p className="px-2 pb-2 text-[11px] leading-relaxed text-white/40">
+                    This workspace has a single owner account.
+                  </p>
+                  <button
+                    onClick={async () => {
+                      setAccountMenuOpen(false);
+                      await api.workspaceAuth.logout().catch(() => undefined);
+                      onSignOut();
+                    }}
+                    className="flex w-full items-center gap-2 px-2 py-2 text-xs text-white/60 transition hover:bg-white/8 hover:text-white"
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                    Sign out
+                  </button>
                 </div>
               </motion.div>
             )}
@@ -814,7 +828,7 @@ function FinanceView({ entries, onNew, onExport }: { entries: LedgerEntry[]; onN
     <div className="mx-auto max-w-[1300px]">
       <PageHeading eyebrow="Restricted access" title="Financial ledger" description="Company income and expenses. Visible only to the Founder and Accountant." action={<div className="flex gap-2"><button onClick={onExport} className="flex items-center gap-2 border border-black/20 bg-white px-4 py-3 text-sm font-semibold"><Download className="h-4 w-4" /> <span className="hidden sm:inline">Export CSV</span></button><button onClick={onNew} className="flex items-center gap-2 bg-[#d90429] px-4 py-3 text-sm font-semibold text-white"><Plus className="h-4 w-4" /> Add entry</button></div>} />
 
-      <div className="mb-8 flex items-center gap-3 border-y border-[#d90429]/30 bg-[#d90429]/5 px-4 py-3 text-xs text-[#9f001d]"><ShieldCheck className="h-4 w-4 shrink-0" /><span><strong>Protected area.</strong> Role-based permissions limit this ledger to two authorized accounts.</span></div>
+      <div className="mb-8 flex items-center gap-3 border-y border-[#d90429]/30 bg-[#d90429]/5 px-4 py-3 text-xs text-[#9f001d]"><ShieldCheck className="h-4 w-4 shrink-0" /><span><strong>Protected area.</strong> The finance ledger is restricted to the workspace owner.</span></div>
 
       <div className="grid gap-px bg-black/15 sm:grid-cols-3">
         {[

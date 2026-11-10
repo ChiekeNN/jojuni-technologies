@@ -11,6 +11,7 @@ import {
 } from "../_lib/http";
 import { mapWorkspaceFile, type FileRow } from "../_lib/mappers";
 import { asEnum, asOptionalString, asString } from "../_lib/validation";
+import { requireWorkspaceSession } from "../_lib/roles";
 
 const COLUMNS = "id, name, project, size_label, kind, updated_label, created_at";
 const SELECT = `select ${COLUMNS} from public.workspace_files`;
@@ -22,6 +23,9 @@ const SELECT = `select ${COLUMNS} from public.workspace_files`;
  * wire this to Vercel Blob / S3 later via the reserved `storage_url` column.
  */
 export default withApiHandler(async (req: ApiRequest, res: ApiResponse) => {
+  // Super-admin only: no valid session means no workspace data.
+  await requireWorkspaceSession(req);
+
   const method = (req.method ?? "").toUpperCase();
 
   if (method === "GET") {

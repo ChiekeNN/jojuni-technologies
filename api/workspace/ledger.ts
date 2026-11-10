@@ -23,7 +23,7 @@ const SELECT = `select ${COLUMNS} from public.ledger_entries`;
  * (see `_lib/roles.ts` for the demo-grade caveat).
  */
 export default withApiHandler(async (req: ApiRequest, res: ApiResponse) => {
-  requireFinanceRole(req);
+  await requireFinanceRole(req);
   const method = (req.method ?? "").toUpperCase();
 
   if (method === "GET") {

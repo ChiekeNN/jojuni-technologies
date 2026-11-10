@@ -99,3 +99,52 @@ create table if not exists public.leads (
 );
 
 create index if not exists leads_created_at_idx on public.leads (created_at desc);
+
+-- ---------------------------------------------------------------------------
+-- Workspace owner account + sessions
+--
+-- The workspace is super-admin only. There is no username: one owner account
+-- is matched by password alone (scrypt, see api/_lib/password.ts).
+--
+-- `password_hash` below is a scrypt hash, not the password. It is the single
+-- supported way the initial credential exists in this repository.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.workspace_accounts (
+  id            uuid primary key default gen_random_uuid(),
+  label         text not null default 'Workspace owner',
+  role          text not null default 'founder'
+                check (role in ('founder', 'accountant', 'staff')),
+  password_hash text not null,
+  active        boolean not null default true,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
+-- Seeds the owner account once. `on conflict` is not available without a
+-- natural key, so the insert is guarded by a not-exists check: re-running
+-- db:migrate never resets a password that has since been changed.
+insert into public.workspace_accounts (label, role, password_hash)
+select 'Workspace owner', 'founder',
+       'scrypt$16384$8$1$0GrbX1jiy2gPf6w30nti9w==$rnMK13NTy70/LaY3pW3obQ44J2xG4iKNlZN6ieWK52azLlHiXhhtTaVSwz1Y9gdmP/dF3l2WTEzXNq3cV15dfA=='
+where not exists (select 1 from public.workspace_accounts);
+
+create table if not exists public.workspace_sessions (
+  id          uuid primary key default gen_random_uuid(),
+  token_hash  text not null unique,
+  subject     text not null default 'owner',
+  role        text not null default 'founder'
+              check (role in ('founder', 'accountant', 'staff')),
+  label       text not null default 'Workspace owner',
+  expires_at  timestamptz not null,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists workspace_sessions_expiry_idx
+  on public.workspace_sessions (expires_at);
+
+create table if not exists public.workspace_login_attempts (
+  client_key  text primary key,
+  attempts    integer not null default 0 check (attempts >= 0),
+  first_at    timestamptz not null default now()
+);

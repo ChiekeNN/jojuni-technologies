@@ -11,12 +11,16 @@ import {
 } from "../_lib/http";
 import { mapTask, type TaskRow } from "../_lib/mappers";
 import { asEnum, asOptionalString, asString, dueLabel } from "../_lib/validation";
+import { requireWorkspaceSession } from "../_lib/roles";
 
 const COLUMNS = "id, title, project, status, assignee, due, priority, position";
 const SELECT = `select ${COLUMNS} from public.tasks`;
 
 /** GET | POST | PATCH | DELETE /api/workspace/tasks */
 export default withApiHandler(async (req: ApiRequest, res: ApiResponse) => {
+  // Super-admin only: no valid session means no workspace data.
+  await requireWorkspaceSession(req);
+
   const method = (req.method ?? "").toUpperCase();
 
   if (method === "GET") {
