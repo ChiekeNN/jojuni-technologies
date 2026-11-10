@@ -65,7 +65,7 @@ function paragraphs(value: string): string {
  * platform kills it — which surfaces to the visitor as a 500 with no JSON body
  * and loses the lead entirely.
  */
-const SEND_TIMEOUT_MS = 8000;
+const SEND_TIMEOUT_MS = 6000;
 
 async function send(payload: {
   to: string;

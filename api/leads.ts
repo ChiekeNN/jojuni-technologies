@@ -78,34 +78,34 @@ export default withApiHandler(async (req: ApiRequest, res: ApiResponse) => {
   const company = asOptionalString(body.company, { max: 200, field: "company" });
   const brief = asString(body.brief, { max: 5000, field: "brief" });
 
-  // Store the lead when a database is available. If it is not, we still email
-  // the brief through: losing a real enquiry because of an infrastructure
-  // problem is worse than losing the row. `stored` tells the client which
-  // happened so nothing is silently swallowed.
-  let stored = false;
-  let leadId: string | null = null;
-  if (isDatabaseConfigured()) {
+  // Storage and email run CONCURRENTLY, not in sequence. Each has an 8s ceiling,
+  // and running them in series would allow up to 16s — past the platform's
+  // function limit, which kills the process and returns an empty 500 with no
+  // JSON body. The visitor sees "the server could not complete this request"
+  // and the lead is lost. Overlapping them keeps the worst case at ~8s.
+  const lead = { name, email, company, brief };
+
+  const storage = (async (): Promise<{ stored: boolean; id: string | null }> => {
+    if (!isDatabaseConfigured()) return { stored: false, id: null };
     try {
       const rows = await query<{ id: string }>(
         "insert into public.leads (name, email, company, brief) values ($1, $2, $3, $4) returning id",
         [name, email, company, brief],
       );
-      stored = true;
-      leadId = rows[0]?.id ?? null;
+      return { stored: true, id: rows[0]?.id ?? null };
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("[leads] could not persist lead, falling back to email only:", error);
+      return { stored: false, id: null };
     }
-  }
+  })();
 
-  // Email runs after the row is committed and never throws: a failed send must
-  // not lose a stored lead, nor fail a submission the visitor made correctly.
-  // Both sends are independent so one failing cannot suppress the other.
-  const lead = { name, email, company, brief };
-  const [team, acknowledgement] = await Promise.all([
+  const [persisted, team, acknowledgement] = await Promise.all([
+    storage,
     sendLeadNotification(lead),
     sendLeadAcknowledgement(lead),
   ]);
+  const { stored, id: leadId } = persisted;
 
   // eslint-disable-next-line no-console
   console.log("[leads] done", { stored, notified: team.sent, acknowledged: acknowledgement.sent });

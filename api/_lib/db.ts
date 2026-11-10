@@ -14,7 +14,7 @@ export class DatabaseError extends Error {
 }
 
 /** Ceiling on a single database round trip. */
-const QUERY_TIMEOUT_MS = 8000;
+const QUERY_TIMEOUT_MS = 6000;
 
 let client: ReturnType<typeof neon> | null = null;
 
