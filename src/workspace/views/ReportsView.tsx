@@ -9,6 +9,7 @@ import { daysUntil, dueLabel, formatDate, hillForProject, isOverdue, projectProg
 import { Button, Chip, Field, IconButton, Modal, Panel, ProgressBar, Select, TextInput, cx } from "../ui";
 import { formatNaira } from "./HomeView";
 import { SERVICE_OPTIONS, itemsForService } from "../services";
+import { BANKS_SORTED, bankByName } from "../banks";
 import type { LedgerDraft } from "../store";
 
 export function ReportsView({ onOpenProject }: { onOpenProject: (projectId: string) => void }) {
@@ -121,6 +122,7 @@ export function FinancePanel() {
   const [typeFilter, setTypeFilter] = useState<"All" | "Income" | "Expense">("All");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [serviceFilter, setServiceFilter] = useState("All");
+  const [bankFilter, setBankFilter] = useState("All");
 
   const income = state.ledger.filter((entry) => entry.type === "Income").reduce((sum, entry) => sum + entry.amount, 0);
   const expense = state.ledger.filter((entry) => entry.type === "Expense").reduce((sum, entry) => sum + entry.amount, 0);
@@ -137,6 +139,7 @@ export function FinancePanel() {
       .filter((entry) => typeFilter === "All" || entry.type === typeFilter)
       .filter((entry) => categoryFilter === "All" || entry.category === categoryFilter)
       .filter((entry) => serviceFilter === "All" || entry.service === serviceFilter)
+      .filter((entry) => bankFilter === "All" || entry.bank === bankFilter)
       .filter(
         (entry) =>
           !needle ||
@@ -145,7 +148,7 @@ export function FinancePanel() {
             .includes(needle),
       )
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [categoryFilter, query, serviceFilter, state.ledger, typeFilter]);
+  }, [bankFilter, categoryFilter, query, serviceFilter, state.ledger, typeFilter]);
 
   /** Which services earned what — the reason the service field exists. */
   const byService = useMemo(() => {
@@ -162,6 +165,22 @@ export function FinancePanel() {
   }, [state.ledger]);
 
   const serviceIncome = byService.reduce((sum, [, row]) => sum + row.total, 0);
+
+  /** Money in and out per bank, in the order the bank list defines. */
+  const byBank = useMemo(() => {
+    const map = new Map<string, { in: number; out: number; count: number }>();
+    for (const entry of state.ledger) {
+      if (!entry.bank) continue;
+      const row = map.get(entry.bank) ?? { in: 0, out: 0, count: 0 };
+      if (entry.type === "Income") row.in += entry.amount;
+      else row.out += entry.amount;
+      row.count += 1;
+      map.set(entry.bank, row);
+    }
+    return [...map.entries()].sort((a, b) => b[1].in + b[1].out - (a[1].in + a[1].out));
+  }, [state.ledger]);
+
+  const unassignedBank = state.ledger.filter((entry) => !entry.bank);
 
   const visibleTotals = visible.reduce(
     (totals, entry) => {
@@ -187,7 +206,8 @@ export function FinancePanel() {
     return [...map.entries()].sort((a, b) => b[1].income + b[1].expense - (a[1].income + a[1].expense));
   }, [state.ledger]);
 
-  const filtered = typeFilter !== "All" || categoryFilter !== "All" || serviceFilter !== "All" || query.trim().length > 0;
+  const filtered =
+    typeFilter !== "All" || categoryFilter !== "All" || serviceFilter !== "All" || bankFilter !== "All" || query.trim().length > 0;
 
   return (
     <Panel padded={false}>
@@ -263,6 +283,21 @@ export function FinancePanel() {
             <option value="Other income">Other income</option>
           </Select>
         </div>
+        <div className="w-44 shrink-0">
+          <Select
+            value={bankFilter}
+            onChange={(event) => setBankFilter(event.target.value)}
+            className="py-1 text-xs"
+            aria-label="Filter by bank"
+          >
+            <option value="All">All banks</option>
+            {BANKS_SORTED.map((option) => (
+              <option key={option.name} value={option.name}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </div>
         {filtered && (
           <button
             type="button"
@@ -271,6 +306,7 @@ export function FinancePanel() {
               setTypeFilter("All");
               setCategoryFilter("All");
               setServiceFilter("All");
+              setBankFilter("All");
             }}
             className="text-[11px] font-semibold text-black/40 hover:text-black"
           >
@@ -328,6 +364,19 @@ export function FinancePanel() {
                       {entry.serviceItem ?? entry.service}
                     </span>
                   )}
+                  {entry.bank && (
+                    <span
+                      className="flex shrink-0 items-center gap-1 rounded px-1 py-px font-semibold"
+                      style={{ color: bankByName(entry.bank)?.color ?? "#525252" }}
+                      title={entry.type === "Income" ? `Paid into ${entry.bank}` : `Paid from ${entry.bank}`}
+                    >
+                      <span
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ backgroundColor: bankByName(entry.bank)?.color ?? "#525252" }}
+                      />
+                      {entry.bank}
+                    </span>
+                  )}
                 </span>
               </span>
               <span
@@ -363,6 +412,61 @@ export function FinancePanel() {
           </p>
         )}
       </div>
+
+      {byBank.length > 0 && (
+        <div className="border-t border-black/8 px-4 py-3">
+          <div className="mb-2 flex flex-wrap items-baseline gap-2">
+            <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-black/45">Money by bank</h3>
+            <span className="text-[11px] text-black/35">
+              where it came in, where it went out
+              {unassignedBank.length > 0 && ` · ${unassignedBank.length} without a bank`}
+            </span>
+            <button
+              type="button"
+              onClick={() => setBankFilter("All")}
+              className="ml-auto text-[11px] font-semibold text-black/40 hover:text-black"
+            >
+              Show all
+            </button>
+          </div>
+          <div className="space-y-1.5">
+            {byBank.map(([name, row]) => {
+              const net = row.in - row.out;
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => setBankFilter(bankFilter === name ? "All" : name)}
+                  className={cx(
+                    "block w-full rounded px-1.5 py-1 text-left transition hover:bg-black/[0.03]",
+                    bankFilter === name && "bg-black/[0.05]",
+                  )}
+                  title={`Filter to ${name}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: bankByName(name)?.color ?? "#525252" }}
+                    />
+                    <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-black/75">{name}</span>
+                    <span className="shrink-0 text-[10px] tabular-nums text-emerald-600">in {formatNaira(row.in)}</span>
+                    <span className="shrink-0 text-[10px] tabular-nums text-[#d90429]">out {formatNaira(row.out)}</span>
+                    <span
+                      className={cx(
+                        "w-24 shrink-0 text-right text-[11px] font-semibold tabular-nums",
+                        net >= 0 ? "text-black/75" : "text-[#d90429]",
+                      )}
+                    >
+                      {net >= 0 ? "" : "−"}
+                      {formatNaira(Math.abs(net))}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {byService.length > 0 && (
         <div className="border-t border-black/8 px-4 py-3">
@@ -448,6 +552,21 @@ export function FinancePanel() {
               <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-black/35">Description</p>
               <p className="text-base font-semibold leading-snug text-black">{viewing.description}</p>
             </div>
+            {viewing.bank && (
+              <div className="flex items-center gap-2 rounded border border-black/8 bg-black/[0.02] px-3 py-2">
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: bankByName(viewing.bank)?.color ?? "#525252" }}
+                />
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-black/35">
+                    {viewing.type === "Income" ? "Bank paid into" : "Bank paying from"}
+                  </p>
+                  <p className="text-sm font-semibold text-black">{viewing.bank}</p>
+                </div>
+              </div>
+            )}
+
             {viewing.service && (
               <div className="rounded border border-black/8 bg-black/[0.02] px-3 py-2">
                 <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-black/35">Service paid for</p>
@@ -568,6 +687,7 @@ function EntryForm({
   const [service, setService] = useState(initial?.service ?? "");
   const [serviceItem, setServiceItem] = useState(initial?.serviceItem ?? "");
   const [projectId, setProjectId] = useState(initial?.projectId ?? "");
+  const [bank, setBank] = useState(initial?.bank ?? "");
   const [error, setError] = useState<string | null>(null);
 
   const subItems = service ? itemsForService(service) : [];
@@ -591,6 +711,10 @@ function EntryForm({
       setError("Choose which service this payment is for.");
       return;
     }
+    if (!bank) {
+      setError(isIncome ? "Choose which bank the payment came into." : "Choose which bank the payment is leaving from.");
+      return;
+    }
     setError(null);
     onSubmit({
       description: description.trim(),
@@ -603,6 +727,7 @@ function EntryForm({
       service: isIncome ? service : undefined,
       serviceItem: isIncome && serviceItem ? serviceItem : undefined,
       projectId: projectId || undefined,
+      bank,
     });
   };
 
@@ -644,6 +769,22 @@ function EntryForm({
       <Field label="Category">
         <TextInput value={category} onChange={(event) => setCategory(event.target.value)} />
       </Field>
+
+      <div className="lg:col-span-2">
+        <Field
+          label={isIncome ? "Bank paid into" : "Bank paying from"}
+          hint={isIncome ? "The account this money landed in." : "The account this money leaves."}
+        >
+          <Select value={bank} onChange={(event) => setBank(event.target.value)}>
+            <option value="">Choose a bank…</option>
+            {BANKS_SORTED.map((option) => (
+              <option key={option.name} value={option.name}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      </div>
 
       {isIncome ? (
         <>

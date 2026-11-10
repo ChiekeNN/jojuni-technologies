@@ -210,6 +210,12 @@ export interface LedgerEntry {
   serviceItem?: string;
   /** The project this money relates to, when it is tied to one. */
   projectId?: ID;
+  /**
+   * Which bank the money moved through. On income that is the account the
+   * payment landed in; on expenses it is the account it left from. One of
+   * `BANK_NAMES` in `banks.ts`. Optional so existing entries keep loading.
+   */
+  bank?: string;
 }
 
 export interface WorkspaceState {
@@ -1053,12 +1059,12 @@ export function createInitialState(): WorkspaceState {
   ];
 
   const ledger: LedgerEntry[] = [
-    { id: "led-1", date: dateDaysFromNow(-2), description: "Meridian milestone payment", category: "Client income", type: "Income", amount: 2850000, service: "Web Development", serviceItem: "Online Stores", projectId: "project-meridian" },
-    { id: "led-2", date: dateDaysFromNow(-3), description: "Cloud infrastructure", category: "Infrastructure", type: "Expense", amount: 186500 },
-    { id: "led-3", date: dateDaysFromNow(-6), description: "Northstar discovery deposit", category: "Client income", type: "Income", amount: 1200000, service: "Software & App Development", serviceItem: "Mobile Apps", projectId: "project-northstar" },
-    { id: "led-4", date: dateDaysFromNow(-8), description: "Design software licences", category: "Software", type: "Expense", amount: 97000 },
-    { id: "led-5", date: dateDaysFromNow(-11), description: "Contract QA support", category: "Contractors", type: "Expense", amount: 325000 },
-    { id: "led-6", date: dateDaysFromNow(-14), description: "Website care retainers", category: "Recurring income", type: "Income", amount: 680000, service: "Web Development", serviceItem: "Website Care" },
+    { id: "led-1", date: dateDaysFromNow(-2), description: "Meridian milestone payment", category: "Client income", type: "Income", amount: 2850000, service: "Web Development", serviceItem: "Online Stores", projectId: "project-meridian", bank: "GTBank" },
+    { id: "led-2", date: dateDaysFromNow(-3), description: "Cloud infrastructure", category: "Infrastructure", type: "Expense", amount: 186500, bank: "Access Bank" },
+    { id: "led-3", date: dateDaysFromNow(-6), description: "Northstar discovery deposit", category: "Client income", type: "Income", amount: 1200000, service: "Software & App Development", serviceItem: "Mobile Apps", projectId: "project-northstar", bank: "Zenith Bank" },
+    { id: "led-4", date: dateDaysFromNow(-8), description: "Design software licences", category: "Software", type: "Expense", amount: 97000, bank: "GTBank" },
+    { id: "led-5", date: dateDaysFromNow(-11), description: "Contract QA support", category: "Contractors", type: "Expense", amount: 325000, bank: "GTBank" },
+    { id: "led-6", date: dateDaysFromNow(-14), description: "Website care retainers", category: "Recurring income", type: "Income", amount: 680000, service: "Web Development", serviceItem: "Website Care", bank: "Paystack (settlement)" },
   ];
 
   return {
