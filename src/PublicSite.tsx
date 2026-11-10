@@ -1,4 +1,5 @@
 import { Layout } from "./site/Layout";
+import { StructuredData } from "./site/StructuredData";
 import { useRouter } from "./site/router";
 import { AboutPage } from "./site/pages/AboutPage";
 import { BlogPage } from "./site/pages/BlogPage";
@@ -25,5 +26,10 @@ export default function PublicSite() {
   else if (path === "/contact") page = <ContactPage />;
   else page = <NotFoundPage />;
 
-  return <Layout>{page}</Layout>;
+  return (
+    <Layout>
+      <StructuredData />
+      {page}
+    </Layout>
+  );
 }

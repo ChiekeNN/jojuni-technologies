@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { CtaBand, PageHero } from "../Layout";
-import { approach, stats, team, values } from "../content";
+import { approach, companyInfo, contactInfo, stats, team, values } from "../content";
 
 export function AboutPage() {
   useEffect(() => {
@@ -89,6 +89,37 @@ export function AboutPage() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="px-5 pb-24 sm:px-8 lg:px-12 lg:pb-32">
+        <div className="mx-auto max-w-[1380px] border-t border-black/15 pt-10">
+          <p className="section-kicker">Registered company</p>
+          <div className="mt-8 grid gap-px border border-black/15 bg-black/15 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="bg-[#f4f2ed] p-6">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-black/40">Legal name</p>
+              <p className="mt-2 text-lg font-semibold tracking-[-0.01em]">{companyInfo.legalName}</p>
+            </div>
+            <div className="bg-[#f4f2ed] p-6">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-black/40">CAC number</p>
+              <p className="mt-2 text-lg font-semibold tracking-[-0.01em]">{companyInfo.registration}</p>
+            </div>
+            <div className="bg-[#f4f2ed] p-6">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-black/40">Jurisdiction</p>
+              <p className="mt-2 text-lg font-semibold tracking-[-0.01em]">{companyInfo.jurisdiction}</p>
+            </div>
+            <div className="bg-[#f4f2ed] p-6">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-black/40">Registered office</p>
+              <p className="mt-2 text-sm font-semibold leading-snug tracking-[-0.01em]">
+                {contactInfo.office}
+              </p>
+            </div>
+          </div>
+          <p className="mt-6 max-w-2xl text-sm leading-relaxed text-black/50">
+            {companyInfo.legalName} is registered with the Corporate Affairs Commission of
+            Nigeria. You can verify the registration on the CAC public search using{" "}
+            {companyInfo.registration}.
+          </p>
         </div>
       </section>
 

@@ -520,6 +520,24 @@ export const contactInfo = {
 };
 
 /**
+ * Corporate identity, as registered with the Corporate Affairs Commission.
+ *
+ * Kept in one place so the footer, the About page, the contact page and the
+ * structured data cannot drift apart. The registered name is the legal form
+ * ("Ltd"); prose can use the shorter trading name.
+ */
+export const companyInfo = {
+  /** Registered name, including the legal suffix. */
+  legalName: "Jojuni Technologies Ltd",
+  /** Short form used across the site. */
+  tradingName: "Jojuni Technologies",
+  rcNumber: "8430792",
+  /** Display form: "RC 8430792". */
+  registration: "RC 8430792",
+  jurisdiction: "Federal Republic of Nigeria",
+} as const;
+
+/**
  * Builds the `tel:` target. Numbers stored in local Nigerian form (leading 0)
  * are converted to the +234 country code so the link dials correctly from
  * outside the country; anything already international is passed through.

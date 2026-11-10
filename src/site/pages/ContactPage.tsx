@@ -1,7 +1,7 @@
 import { ArrowUpRight, Clock3, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 import { useEffect } from "react";
 import { CtaBand, PageHero } from "../Layout";
-import { contactInfo, telHref, whatsappHref } from "../content";
+import { companyInfo, contactInfo, telHref, whatsappHref } from "../content";
 
 export function ContactPage() {
   useEffect(() => {
@@ -114,6 +114,9 @@ export function ContactPage() {
                 <p className="mt-3 text-sm leading-relaxed text-black/55">
                   Visits are by appointment — message or call first so we can make sure the right
                   people are in.
+                </p>
+                <p className="mt-3 text-sm leading-relaxed text-black/55">
+                  {companyInfo.legalName} · CAC {companyInfo.registration}
                 </p>
               </div>
             </div>
