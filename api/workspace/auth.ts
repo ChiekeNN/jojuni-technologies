@@ -95,7 +95,21 @@ export default withApiHandler(async (req: ApiRequest, res: ApiResponse) => {
   const method = (req.method ?? "GET").toUpperCase();
 
   if (method === "GET") {
-    const session = await readSession(req);
+    let session = null;
+    try {
+      session = await readSession(req);
+    } catch (error) {
+      // An unreadable database must not be reported as "signed out": the UI
+      // would show the sign-in form and the password would then fail for a
+      // reason that has nothing to do with the password.
+      const detail = error instanceof Error ? error.message : "unexpected error";
+      sendJson(res, 503, {
+        error: "database_unreachable",
+        message: "The workspace database could not be reached.",
+        hint: detail,
+      });
+      return;
+    }
     if (!session) {
       sendJson(res, 200, { authenticated: false });
       return;
