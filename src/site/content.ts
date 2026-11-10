@@ -513,6 +513,8 @@ export const testimonials: { quote: string; name: string; role: string }[] = [
 export const contactInfo = {
   email: "hello@jojunitechnologies.com.ng",
   phone: "08059363013",
+  /** Same line as `phone`; exposed separately so the UI can label it clearly. */
+  whatsapp: "08059363013",
   office: "1, Mpi Avenue, off Chinda Road, off Ada George Road, Port Harcourt, Rivers State, Nigeria",
   hours: "Monday – Friday, 9:00 – 18:00 WAT",
 };
@@ -525,6 +527,18 @@ export const contactInfo = {
 export function telHref(phone: string = contactInfo.phone): string {
   const digits = phone.replace(/[^\d+]/g, "");
   return digits.startsWith("0") ? `+234${digits.slice(1)}` : digits;
+}
+
+/**
+ * Builds a wa.me link. WhatsApp requires the number in full international form
+ * with no punctuation, so the same normalisation applies, minus the leading "+".
+ */
+export function whatsappHref(
+  phone: string = contactInfo.whatsapp,
+  message = "Hello Jojuni Technologies, I would like to discuss a project.",
+): string {
+  const digits = telHref(phone).replace(/\D/g, "");
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 }
 
 export const navItems: { label: string; to: string }[] = [
