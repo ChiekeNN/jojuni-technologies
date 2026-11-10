@@ -118,6 +118,7 @@ interface Actions {
 
   /* finance */
   addLedgerEntry: (input: { date: string; description: string; category: string; type: LedgerEntry["type"]; amount: number }) => void;
+  updateLedgerEntry: (id: ID, patch: Partial<Omit<LedgerEntry, "id">>) => void;
   deleteLedgerEntry: (id: ID) => void;
 }
 
@@ -448,6 +449,9 @@ export function useWorkspaceStore(): WorkspaceStore {
           ...s,
           ledger: [{ ...input, id: uid("led") } as LedgerEntry, ...s.ledger],
         })),
+
+      updateLedgerEntry: (id, patch) =>
+        commit((s) => ({ ...s, ledger: s.ledger.map((l) => (l.id === id ? { ...l, ...patch } : l)) })),
 
       deleteLedgerEntry: (id) => commit((s) => ({ ...s, ledger: s.ledger.filter((l) => l.id !== id) })),
     };
