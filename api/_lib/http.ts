@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { ApiErrorBody, ApiErrorCode } from "../../shared/types";
+import type { ApiErrorBody } from "../../shared/types";
+import type { ApiErrorCode } from "./errors";
 import { DatabaseError, isDatabaseError } from "./db";
 
 /**

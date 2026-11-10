@@ -1,5 +1,6 @@
-import { FINANCE_ROLES, type Role } from "../../shared/types";
+import type { Role } from "../../shared/types";
 import { DatabaseError } from "./db";
+import { FINANCE_ROLES } from "./errors";
 import { headerValue, type ApiRequest } from "./http";
 
 /**
@@ -14,6 +15,7 @@ export function workspaceRole(req: ApiRequest): Role | null {
   const raw = headerValue(req, "x-workspace-role");
   return raw === "founder" || raw === "accountant" || raw === "staff" ? raw : null;
 }
+
 
 export function requireFinanceRole(req: ApiRequest): void {
   const role = workspaceRole(req);
