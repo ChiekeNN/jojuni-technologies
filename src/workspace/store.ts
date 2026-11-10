@@ -37,6 +37,9 @@ import {
   type WorkspaceState,
 } from "./model";
 
+/** What a finance form produces: everything on an entry except its id. */
+export type LedgerDraft = Omit<LedgerEntry, "id">;
+
 export interface WorkspaceStore {
   state: WorkspaceState;
   /** True once at least one change has been saved in this browser. */
@@ -117,8 +120,8 @@ interface Actions {
   deleteBookmark: (id: ID) => void;
 
   /* finance */
-  addLedgerEntry: (input: { date: string; description: string; category: string; type: LedgerEntry["type"]; amount: number }) => void;
-  updateLedgerEntry: (id: ID, patch: Partial<Omit<LedgerEntry, "id">>) => void;
+  addLedgerEntry: (input: LedgerDraft) => void;
+  updateLedgerEntry: (id: ID, patch: Partial<LedgerDraft>) => void;
   deleteLedgerEntry: (id: ID) => void;
 }
 

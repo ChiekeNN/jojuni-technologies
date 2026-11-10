@@ -200,6 +200,16 @@ export interface LedgerEntry {
   category: string;
   type: TransactionType;
   amount: number;
+  /**
+   * Income only: which service was paid for. One of
+   * `INCOME_REASON_OPTIONS` in `services.ts`, or "" for older entries and
+   * expenses. Optional so existing saved workspaces keep loading.
+   */
+  service?: string;
+  /** Income only: the sub-service or entry point under `service`, if chosen. */
+  serviceItem?: string;
+  /** The project this money relates to, when it is tied to one. */
+  projectId?: ID;
 }
 
 export interface WorkspaceState {
@@ -1043,12 +1053,12 @@ export function createInitialState(): WorkspaceState {
   ];
 
   const ledger: LedgerEntry[] = [
-    { id: "led-1", date: dateDaysFromNow(-2), description: "Meridian milestone payment", category: "Client income", type: "Income", amount: 2850000 },
+    { id: "led-1", date: dateDaysFromNow(-2), description: "Meridian milestone payment", category: "Client income", type: "Income", amount: 2850000, service: "Web Development", serviceItem: "Online Stores", projectId: "project-meridian" },
     { id: "led-2", date: dateDaysFromNow(-3), description: "Cloud infrastructure", category: "Infrastructure", type: "Expense", amount: 186500 },
-    { id: "led-3", date: dateDaysFromNow(-6), description: "Northstar discovery deposit", category: "Client income", type: "Income", amount: 1200000 },
+    { id: "led-3", date: dateDaysFromNow(-6), description: "Northstar discovery deposit", category: "Client income", type: "Income", amount: 1200000, service: "Software & App Development", serviceItem: "Mobile Apps", projectId: "project-northstar" },
     { id: "led-4", date: dateDaysFromNow(-8), description: "Design software licences", category: "Software", type: "Expense", amount: 97000 },
     { id: "led-5", date: dateDaysFromNow(-11), description: "Contract QA support", category: "Contractors", type: "Expense", amount: 325000 },
-    { id: "led-6", date: dateDaysFromNow(-14), description: "Website care retainers", category: "Recurring income", type: "Income", amount: 680000 },
+    { id: "led-6", date: dateDaysFromNow(-14), description: "Website care retainers", category: "Recurring income", type: "Income", amount: 680000, service: "Web Development", serviceItem: "Website Care" },
   ];
 
   return {

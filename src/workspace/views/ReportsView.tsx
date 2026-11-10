@@ -8,6 +8,8 @@ import { useWorkspace } from "../store";
 import { daysUntil, dueLabel, formatDate, hillForProject, isOverdue, projectProgress, todayISO } from "../model";
 import { Button, Chip, Field, IconButton, Modal, Panel, ProgressBar, Select, TextInput, cx } from "../ui";
 import { formatNaira } from "./HomeView";
+import { SERVICE_OPTIONS, itemsForService } from "../services";
+import type { LedgerDraft } from "../store";
 
 export function ReportsView({ onOpenProject }: { onOpenProject: (projectId: string) => void }) {
   const { state } = useWorkspace();
@@ -118,6 +120,7 @@ export function FinancePanel() {
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<"All" | "Income" | "Expense">("All");
   const [categoryFilter, setCategoryFilter] = useState("All");
+  const [serviceFilter, setServiceFilter] = useState("All");
 
   const income = state.ledger.filter((entry) => entry.type === "Income").reduce((sum, entry) => sum + entry.amount, 0);
   const expense = state.ledger.filter((entry) => entry.type === "Expense").reduce((sum, entry) => sum + entry.amount, 0);
@@ -133,9 +136,32 @@ export function FinancePanel() {
     return state.ledger
       .filter((entry) => typeFilter === "All" || entry.type === typeFilter)
       .filter((entry) => categoryFilter === "All" || entry.category === categoryFilter)
-      .filter((entry) => !needle || `${entry.description} ${entry.category}`.toLowerCase().includes(needle))
+      .filter((entry) => serviceFilter === "All" || entry.service === serviceFilter)
+      .filter(
+        (entry) =>
+          !needle ||
+          `${entry.description} ${entry.category} ${entry.service ?? ""} ${entry.serviceItem ?? ""}`
+            .toLowerCase()
+            .includes(needle),
+      )
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [categoryFilter, query, state.ledger, typeFilter]);
+  }, [categoryFilter, query, serviceFilter, state.ledger, typeFilter]);
+
+  /** Which services earned what — the reason the service field exists. */
+  const byService = useMemo(() => {
+    const map = new Map<string, { total: number; count: number; items: Map<string, number> }>();
+    for (const entry of state.ledger) {
+      if (entry.type !== "Income" || !entry.service) continue;
+      const row = map.get(entry.service) ?? { total: 0, count: 0, items: new Map<string, number>() };
+      row.total += entry.amount;
+      row.count += 1;
+      if (entry.serviceItem) row.items.set(entry.serviceItem, (row.items.get(entry.serviceItem) ?? 0) + entry.amount);
+      map.set(entry.service, row);
+    }
+    return [...map.entries()].sort((a, b) => b[1].total - a[1].total);
+  }, [state.ledger]);
+
+  const serviceIncome = byService.reduce((sum, [, row]) => sum + row.total, 0);
 
   const visibleTotals = visible.reduce(
     (totals, entry) => {
@@ -161,7 +187,7 @@ export function FinancePanel() {
     return [...map.entries()].sort((a, b) => b[1].income + b[1].expense - (a[1].income + a[1].expense));
   }, [state.ledger]);
 
-  const filtered = typeFilter !== "All" || categoryFilter !== "All" || query.trim().length > 0;
+  const filtered = typeFilter !== "All" || categoryFilter !== "All" || serviceFilter !== "All" || query.trim().length > 0;
 
   return (
     <Panel padded={false}>
@@ -221,6 +247,22 @@ export function FinancePanel() {
             ))}
           </Select>
         </div>
+        <div className="w-52 shrink-0">
+          <Select
+            value={serviceFilter}
+            onChange={(event) => setServiceFilter(event.target.value)}
+            className="py-1 text-xs"
+            aria-label="Filter by service"
+          >
+            <option value="All">All services</option>
+            {SERVICE_OPTIONS.map((option) => (
+              <option key={option.title} value={option.title}>
+                {option.title}
+              </option>
+            ))}
+            <option value="Other income">Other income</option>
+          </Select>
+        </div>
         {filtered && (
           <button
             type="button"
@@ -228,6 +270,7 @@ export function FinancePanel() {
               setQuery("");
               setTypeFilter("All");
               setCategoryFilter("All");
+              setServiceFilter("All");
             }}
             className="text-[11px] font-semibold text-black/40 hover:text-black"
           >
@@ -243,6 +286,7 @@ export function FinancePanel() {
 
       {adding && (
         <EntryForm
+          projects={state.projects.map((project) => ({ id: project.id, name: project.name }))}
           submitLabel="Save entry"
           onCancel={() => setAdding(false)}
           onSubmit={(draft) => {
@@ -277,8 +321,13 @@ export function FinancePanel() {
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-xs font-semibold text-black/80">{entry.description}</span>
-                <span className="block text-[10px] text-black/35">
-                  {formatDate(entry.date, true)} · {entry.category}
+                <span className="flex items-center gap-1 text-[10px] text-black/35">
+                  <span>{formatDate(entry.date, true)} · {entry.category}</span>
+                  {entry.service && (
+                    <span className="truncate rounded bg-black/5 px-1 py-px font-semibold text-black/50">
+                      {entry.serviceItem ?? entry.service}
+                    </span>
+                  )}
                 </span>
               </span>
               <span
@@ -315,6 +364,57 @@ export function FinancePanel() {
         )}
       </div>
 
+      {byService.length > 0 && (
+        <div className="border-t border-black/8 px-4 py-3">
+          <div className="mb-2 flex flex-wrap items-baseline gap-2">
+            <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-black/45">Income by service</h3>
+            <span className="text-[11px] text-black/35">
+              {formatNaira(serviceIncome)}
+              {income > serviceIncome && ` · ${formatNaira(income - serviceIncome)} not assigned to a service`}
+            </span>
+            <button
+              type="button"
+              onClick={() => setServiceFilter("All")}
+              className="ml-auto text-[11px] font-semibold text-black/40 hover:text-black"
+            >
+              Show all
+            </button>
+          </div>
+          <div className="space-y-1.5">
+            {byService.map(([name, row]) => {
+              const share = serviceIncome ? Math.round((row.total / serviceIncome) * 100) : 0;
+              const topItem = [...row.items.entries()].sort((a, b) => b[1] - a[1])[0];
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => setServiceFilter(serviceFilter === name ? "All" : name)}
+                  className={cx(
+                    "block w-full rounded px-1.5 py-1 text-left transition hover:bg-black/[0.03]",
+                    serviceFilter === name && "bg-black/[0.05]",
+                  )}
+                  title={`Filter to ${name}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-black/75">{name}</span>
+                    {topItem && (
+                      <span className="hidden shrink-0 truncate text-[10px] text-black/35 sm:block">{topItem[0]}</span>
+                    )}
+                    <span className="shrink-0 text-[10px] tabular-nums text-black/40">{share}%</span>
+                    <span className="w-24 shrink-0 text-right text-[11px] font-semibold tabular-nums text-emerald-600">
+                      {formatNaira(row.total)}
+                    </span>
+                  </div>
+                  <div className="mt-1 h-1 overflow-hidden rounded-full bg-black/8">
+                    <div className="h-full rounded-full bg-emerald-600/70" style={{ width: `${share}%` }} />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {byCategory.length > 0 && (
         <div className="grid gap-2 border-t border-black/8 bg-black/[0.015] p-4 sm:grid-cols-2 lg:grid-cols-3">
           {byCategory.slice(0, 6).map(([label, totals]) => (
@@ -348,6 +448,13 @@ export function FinancePanel() {
               <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-black/35">Description</p>
               <p className="text-base font-semibold leading-snug text-black">{viewing.description}</p>
             </div>
+            {viewing.service && (
+              <div className="rounded border border-black/8 bg-black/[0.02] px-3 py-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-black/35">Service paid for</p>
+                <p className="text-sm font-semibold text-black">{viewing.service}</p>
+                {viewing.serviceItem && <p className="text-[11px] text-black/50">{viewing.serviceItem}</p>}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-black/35">Amount</p>
@@ -398,6 +505,7 @@ export function FinancePanel() {
           <EntryForm
             key={editing.id}
             initial={editing}
+            projects={state.projects.map((project) => ({ id: project.id, name: project.name }))}
             submitLabel="Save changes"
             onCancel={() => setEditingId(null)}
             onSubmit={(draft) => {
@@ -438,16 +546,18 @@ export function FinancePanel() {
   );
 }
 
-/** Shared add/edit form for a ledger entry. */
+/** Shared add/edit form for a ledger entry. Income asks which service was paid for. */
 function EntryForm({
   initial,
+  projects,
   submitLabel,
   onSubmit,
   onCancel,
 }: {
-  initial?: { description: string; category: string; type: "Income" | "Expense"; amount: number; date: string };
+  initial?: LedgerDraft;
+  projects: { id: string; name: string }[];
   submitLabel: string;
-  onSubmit: (draft: { description: string; category: string; type: "Income" | "Expense"; amount: number; date: string }) => void;
+  onSubmit: (draft: LedgerDraft) => void;
   onCancel: () => void;
 }) {
   const [description, setDescription] = useState(initial?.description ?? "");
@@ -455,7 +565,13 @@ function EntryForm({
   const [type, setType] = useState<"Income" | "Expense">(initial?.type ?? "Income");
   const [amount, setAmount] = useState(initial ? String(initial.amount) : "");
   const [date, setDate] = useState(initial?.date ?? todayISO());
+  const [service, setService] = useState(initial?.service ?? "");
+  const [serviceItem, setServiceItem] = useState(initial?.serviceItem ?? "");
+  const [projectId, setProjectId] = useState(initial?.projectId ?? "");
   const [error, setError] = useState<string | null>(null);
+
+  const subItems = service ? itemsForService(service) : [];
+  const isIncome = type === "Income";
 
   const submit = () => {
     if (!description.trim()) {
@@ -471,8 +587,23 @@ function EntryForm({
       setError("Pick a date.");
       return;
     }
+    if (isIncome && !service) {
+      setError("Choose which service this payment is for.");
+      return;
+    }
     setError(null);
-    onSubmit({ description: description.trim(), category: category.trim() || "Other", type, amount: value, date });
+    onSubmit({
+      description: description.trim(),
+      category: category.trim() || (isIncome ? "Client income" : "Other"),
+      type,
+      amount: value,
+      date,
+      // An expense has no service attached, so clear both fields rather than
+      // leaving a stale service behind after switching the type.
+      service: isIncome ? service : undefined,
+      serviceItem: isIncome && serviceItem ? serviceItem : undefined,
+      projectId: projectId || undefined,
+    });
   };
 
   return (
@@ -482,6 +613,7 @@ function EntryForm({
           <TextInput
             autoFocus
             value={description}
+            placeholder={isIncome ? "e.g. Meridian milestone payment" : "e.g. Cloud hosting"}
             onChange={(event) => setDescription(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") submit();
@@ -490,13 +622,18 @@ function EntryForm({
         </Field>
       </div>
       <Field label="Type">
-        <Select value={type} onChange={(event) => setType(event.target.value as "Income" | "Expense")}>
+        <Select
+          value={type}
+          onChange={(event) => {
+            const next = event.target.value as "Income" | "Expense";
+            setType(next);
+            // Fee categories make no sense on income, and vice versa.
+            setCategory(next === "Income" ? "Client income" : "Infrastructure");
+          }}
+        >
           <option value="Income">Income</option>
           <option value="Expense">Expense</option>
         </Select>
-      </Field>
-      <Field label="Category">
-        <TextInput value={category} onChange={(event) => setCategory(event.target.value)} />
       </Field>
       <Field label="Amount (₦)">
         <TextInput type="number" min="0" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} />
@@ -504,6 +641,83 @@ function EntryForm({
       <Field label="Date">
         <TextInput type="date" value={date} onChange={(event) => setDate(event.target.value)} />
       </Field>
+      <Field label="Category">
+        <TextInput value={category} onChange={(event) => setCategory(event.target.value)} />
+      </Field>
+
+      {isIncome ? (
+        <>
+          <div className="lg:col-span-3">
+            <Field label="Service paid for" hint="Every income entry is tied to the service the client is paying for.">
+              <Select
+                value={service}
+                onChange={(event) => {
+                  setService(event.target.value);
+                  setServiceItem("");
+                }}
+              >
+                <option value="">Choose a service…</option>
+                {SERVICE_OPTIONS.map((option) => (
+                  <option key={option.title} value={option.title}>
+                    {option.title}
+                  </option>
+                ))}
+                <option value="Other income">Other income (no service)</option>
+              </Select>
+            </Field>
+          </div>
+          <div className="lg:col-span-3">
+            <Field
+              label="Sub-service"
+              hint={subItems.length ? undefined : "Pick a service above to narrow this down."}
+            >
+              <Select
+                value={serviceItem}
+                disabled={!subItems.length}
+                onChange={(event) => setServiceItem(event.target.value)}
+              >
+                <option value="">
+                  {subItems.length ? "Not specific / whole service" : "—"}
+                </option>
+                {subItems.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+        </>
+      ) : (
+        <div className="lg:col-span-2">
+          <Field label="Project" hint="Which project this cost belongs to, if any.">
+            <Select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
+              <option value="">Not tied to a project</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+      )}
+
+      {isIncome && (
+        <div className="lg:col-span-2">
+          <Field label="Project" hint="Optional — ties the payment to a project.">
+            <Select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
+              <option value="">Not tied to a project</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+      )}
+
       {error && <p className="text-[11px] font-semibold text-[#d90429] lg:col-span-6">{error}</p>}
       <div className="flex items-end gap-2 lg:col-span-6">
         <Button tone="primary" onClick={submit}>
