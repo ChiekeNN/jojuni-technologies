@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 
 import type { Role } from "../../shared/types";
-import { DatabaseError, isDatabaseConfigured, query } from "./db";
+import { isDatabaseConfigured, query } from "./db";
 import { headerValue, type ApiRequest } from "./http";
 
 /**
@@ -138,10 +138,11 @@ export async function readSession(req: ApiRequest): Promise<WorkspaceSession | n
       expiresAt: new Date(row.expires_at),
     };
   } catch (error) {
-    // A missing table must not look like a valid login, but it also should not
-    // be reported as invalid credentials. Surface it as a setup problem.
-    if (error instanceof DatabaseError && error.code === "schema_missing") throw error;
-    return null;
+    // "No session" and "cannot read the session table" are different answers
+    // and callers must be able to tell them apart: one means show the sign-in
+    // form, the other means the deployment is misconfigured. Everything except
+    // a genuinely absent row is rethrown.
+    throw error;
   }
 }
 

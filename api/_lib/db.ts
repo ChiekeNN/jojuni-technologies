@@ -1,4 +1,4 @@
-import { neon } from "@neondatabase/serverless";
+import type { NeonQueryFunction } from "@neondatabase/serverless";
 import type { ApiErrorCode } from "../../shared/types";
 
 export class DatabaseError extends Error {
@@ -16,14 +16,34 @@ export class DatabaseError extends Error {
 /** Ceiling on a single database round trip. */
 const QUERY_TIMEOUT_MS = 6000;
 
-let client: ReturnType<typeof neon> | null = null;
+/**
+ * The driver instance, created lazily.
+ *
+ * `@neondatabase/serverless` used to be a static import here. Every route pulls
+ * `db.ts` in, so a static import means the driver is evaluated during function
+ * *load*: if it fails there (missing dep in the build output, incompatible
+ * runtime), the module throws before any handler runs. Vercel then reports a
+ * bodyless `FUNCTION_INVOCATION_FAILED` and there is nothing for our own error
+ * handling to catch — every route dies at once, including ones untouched for
+ * weeks.
+ *
+ * Loading it on first use confines any such failure to a single request, where
+ * it becomes a normal JSON 503 with a hint instead of an opaque 500.
+ */
+let client: NeonQueryFunction<false, false> | null = null;
+let driverPromise: Promise<typeof import("@neondatabase/serverless")> | null = null;
+
+function loadDriver() {
+  driverPromise ??= import("@neondatabase/serverless");
+  return driverPromise;
+}
 
 /**
  * Returns the Neon HTTP driver, configured from `DATABASE_URL`.
  * Neon's pooled connection string is expected (the one with `-pooler` in the
  * host), which is what the Vercel ↔ Neon integration provides as well.
  */
-export function getSql() {
+export async function getSql(): Promise<NeonQueryFunction<false, false>> {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new DatabaseError(
@@ -33,6 +53,7 @@ export function getSql() {
     );
   }
   if (!client) {
+    const { neon } = await loadDriver();
     client = neon(url, {
       // Bound every query. The Neon HTTP driver otherwise waits indefinitely,
       // and a stalled request turns a recoverable lead into a platform-level
@@ -68,7 +89,7 @@ export async function query<T = Record<string, unknown>>(
   text: string,
   params: unknown[] = [],
 ): Promise<T[]> {
-  const sql = getSql();
+  const sql = await getSql();
   try {
     return (await sql.query(text, params)) as T[];
   } catch (error) {
