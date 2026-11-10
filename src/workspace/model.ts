@@ -1,0 +1,1080 @@
+/**
+ * Workspace domain model.
+ *
+ * This is the local-first layer behind `/workspace`. Everything the app needs
+ * lives in one plain object (`WorkspaceState`) that is persisted to
+ * `localStorage` on every change, so the workspace works with no server, no
+ * database and no sign-in. `exportState` / `importState` give you a JSON file
+ * you can move between browsers.
+ *
+ * When the hosted database is wired up (see `api/workspace/*`) the same shapes
+ * can be persisted server-side without touching the UI: the components only
+ * ever read from `WorkspaceState`.
+ */
+
+export type ID = string;
+
+export type ProjectStatus = "active" | "archived";
+export type PostCategory = "Announcement" | "Discussion";
+export type EventKind = "Milestone" | "Deadline" | "Meeting" | "Event";
+export type DocKind = "doc" | "file" | "link";
+export type TransactionType = "Income" | "Expense";
+
+export interface Person {
+  id: ID;
+  name: string;
+  initials: string;
+  title: string;
+  email: string;
+  /** Solid colour used for the avatar chip. */
+  color: string;
+  /** Owner is always a member of every project and cannot be removed. */
+  owner?: boolean;
+}
+
+export interface Project {
+  id: ID;
+  name: string;
+  /** Short reference shown in dense lists, e.g. `MC`. */
+  code: string;
+  client: string;
+  description: string;
+  color: string;
+  /** ISO dates, `YYYY-MM-DD`. */
+  start: string;
+  end: string;
+  status: ProjectStatus;
+  /** Person ids. */
+  members: ID[];
+  /** When false the project is internal and never shown in client view. */
+  clientVisible: boolean;
+  createdAt: string;
+}
+
+export interface TodoList {
+  id: ID;
+  projectId: ID;
+  title: string;
+  createdAt: string;
+}
+
+export interface Subtask {
+  id: ID;
+  title: string;
+  done: boolean;
+}
+
+export interface Todo {
+  id: ID;
+  listId: ID;
+  projectId: ID;
+  title: string;
+  assigneeId: ID | "";
+  /** ISO date or "" for none. */
+  due: string;
+  done: boolean;
+  completedAt?: string;
+  notes: string;
+  subtasks: Subtask[];
+  createdAt: string;
+}
+
+export interface Reply {
+  id: ID;
+  authorId: ID;
+  body: string;
+  createdAt: string;
+}
+
+export interface Post {
+  id: ID;
+  projectId: ID;
+  title: string;
+  body: string;
+  authorId: ID;
+  category: PostCategory;
+  pinned: boolean;
+  /** Hidden from the client view when false. */
+  clientVisible: boolean;
+  replies: Reply[];
+  createdAt: string;
+}
+
+export interface ChatMessage {
+  id: ID;
+  projectId: ID;
+  authorId: ID;
+  body: string;
+  createdAt: string;
+}
+
+export interface EventItem {
+  id: ID;
+  projectId: ID;
+  title: string;
+  date: string;
+  time: string;
+  kind: EventKind;
+  createdAt: string;
+}
+
+export interface Folder {
+  id: ID;
+  projectId: ID;
+  name: string;
+}
+
+export interface DocFile {
+  id: ID;
+  projectId: ID;
+  folderId: ID | "";
+  name: string;
+  kind: DocKind;
+  /** Markdown-ish body for `doc`, the URL for `link`, a note for `file`. */
+  body: string;
+  clientVisible: boolean;
+  updatedAt: string;
+  createdAt: string;
+}
+
+export interface CardColumn {
+  id: ID;
+  projectId: ID;
+  name: string;
+  position: number;
+}
+
+export interface Card {
+  id: ID;
+  projectId: ID;
+  columnId: ID;
+  title: string;
+  notes: string;
+  assigneeId: ID | "";
+  due: string;
+  createdAt: string;
+}
+
+export interface HillScope {
+  id: ID;
+  projectId: ID;
+  label: string;
+  /** 0–100. Below 50 is the "figuring it out" climb, above 50 is execution. */
+  progress: number;
+}
+
+export interface CheckinAnswer {
+  id: ID;
+  authorId: ID;
+  body: string;
+  createdAt: string;
+}
+
+export interface Checkin {
+  id: ID;
+  projectId: ID;
+  prompt: string;
+  schedule: string;
+  answers: CheckinAnswer[];
+}
+
+export interface Note {
+  id: ID;
+  title: string;
+  body: string;
+  updatedAt: string;
+}
+
+export interface Bookmark {
+  id: ID;
+  label: string;
+  /** Route inside the workspace, e.g. `project/<id>`. */
+  target: string;
+  createdAt: string;
+}
+
+export interface LedgerEntry {
+  id: ID;
+  date: string;
+  description: string;
+  category: string;
+  type: TransactionType;
+  amount: number;
+}
+
+export interface WorkspaceState {
+  version: 2;
+  people: Person[];
+  /** The signed-in owner. Everything is edited as this person. */
+  currentUserId: ID;
+  projects: Project[];
+  todoLists: TodoList[];
+  todos: Todo[];
+  posts: Post[];
+  chats: ChatMessage[];
+  events: EventItem[];
+  folders: Folder[];
+  docs: DocFile[];
+  cardColumns: CardColumn[];
+  cards: Card[];
+  hill: HillScope[];
+  checkins: Checkin[];
+  notes: Note[];
+  bookmarks: Bookmark[];
+  ledger: LedgerEntry[];
+}
+
+/* ------------------------------------------------------------------ */
+/* Small helpers                                                       */
+/* ------------------------------------------------------------------ */
+
+export const STORAGE_KEY = "jojuni.workspace.v2";
+
+export function uid(prefix = "id"): ID {
+  const random =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2) + Date.now().toString(36);
+  return `${prefix}-${random}`;
+}
+
+export function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function isoDaysAgo(days: number, hour = 9): string {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  date.setHours(hour, 0, 0, 0);
+  return date.toISOString();
+}
+
+function dateDaysFromNow(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+const SHORT_DATE = new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short" });
+const LONG_DATE = new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+
+export function formatDate(iso: string, long = false): string {
+  if (!iso) return "No date";
+  const date = new Date(`${iso.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return iso;
+  return (long ? LONG_DATE : SHORT_DATE).format(date);
+}
+
+export function formatStamp(iso: string): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+/** Whole days from today to `iso`. Negative means overdue. */
+export function daysUntil(iso: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}/.test(iso)) return null;
+  const target = new Date(`${iso.slice(0, 10)}T00:00:00`);
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((target.getTime() - start.getTime()) / 86_400_000);
+}
+
+/** Friendly relative label: Today, Tomorrow, 3 days ago, 12 Nov. */
+export function dueLabel(iso: string): string {
+  const days = daysUntil(iso);
+  if (days === null) return "No date";
+  if (days === 0) return "Today";
+  if (days === 1) return "Tomorrow";
+  if (days === -1) return "Yesterday";
+  if (days < -1) return `${Math.abs(days)} days ago`;
+  if (days < 7) return `In ${days} days`;
+  return formatDate(iso);
+}
+
+export function relativeTime(iso: string): string {
+  if (!iso) return "";
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const minutes = Math.round((Date.now() - then) / 60_000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hr${hours === 1 ? "" : "s"} ago`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `${days} day${days === 1 ? "" : "s"} ago`;
+  return formatDate(iso.slice(0, 10));
+}
+
+export function isOverdue(iso: string): boolean {
+  const days = daysUntil(iso);
+  return days !== null && days < 0;
+}
+
+export function isThisWeek(iso: string): boolean {
+  const days = daysUntil(iso);
+  return days !== null && days >= 0 && days <= 7;
+}
+
+/* ------------------------------------------------------------------ */
+/* Selectors                                                           */
+/* ------------------------------------------------------------------ */
+
+export function personById(state: WorkspaceState, id: ID | ""): Person | undefined {
+  return state.people.find((person) => person.id === id);
+}
+
+export function initialsOf(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+export function projectById(state: WorkspaceState, id: ID): Project | undefined {
+  return state.projects.find((project) => project.id === id);
+}
+
+export function todosForProject(state: WorkspaceState, projectId: ID): Todo[] {
+  return state.todos.filter((todo) => todo.projectId === projectId);
+}
+
+/** Share of to-dos completed, 0–100. Empty projects report 0. */
+export function projectProgress(state: WorkspaceState, projectId: ID): number {
+  const todos = todosForProject(state, projectId);
+  if (!todos.length) return 0;
+  const done = todos.filter((todo) => todo.done).length;
+  return Math.round((done / todos.length) * 100);
+}
+
+export function hillForProject(state: WorkspaceState, projectId: ID): HillScope[] {
+  return state.hill.filter((scope) => scope.projectId === projectId);
+}
+
+/**
+ * Basecamp-style hill chart position.
+ *
+ * A scope that is still being figured out climbs the left slope; once it is
+ * understood it crests the hill and moves down the right slope as it gets
+ * executed. `progress` 0–100 maps onto that path, so a single number is enough
+ * to place a dot.
+ */
+export function hillPoint(progress: number): { x: number; y: number; phase: "uphill" | "downhill" } {
+  const clamped = Math.max(0, Math.min(100, progress));
+  // `t` runs 0→2: 0–1 is the climb (figuring it out), 1–2 the descent (executing).
+  const t = clamped / 50;
+  // `x` is always the fraction across the whole hill, 0→1, so callers can scale
+  // it straight into a chart width. `y` is 0 at the feet and 1 at the peak.
+  const x = t / 2;
+  if (t <= 1) {
+    return { x, y: Math.sin((t * Math.PI) / 2), phase: "uphill" };
+  }
+  return { x, y: Math.cos(((t - 1) * Math.PI) / 2), phase: "downhill" };
+}
+
+export interface ActivityItem {
+  id: string;
+  projectId: ID;
+  actorId: ID;
+  text: string;
+  detail?: string;
+  at: string;
+  /** Where clicking it should land. */
+  target: string;
+}
+
+/** Everything that happened, newest first, derived from the stored records. */
+export function activityFeed(state: WorkspaceState, limit = 60): ActivityItem[] {
+  const items: ActivityItem[] = [];
+
+  for (const post of state.posts) {
+    items.push({
+      id: `act-post-${post.id}`,
+      projectId: post.projectId,
+      actorId: post.authorId,
+      text: `posted “${post.title}”`,
+      at: post.createdAt,
+      target: `project/${post.projectId}/board`,
+    });
+    for (const reply of post.replies) {
+      items.push({
+        id: `act-reply-${reply.id}`,
+        projectId: post.projectId,
+        actorId: reply.authorId,
+        text: `replied to “${post.title}”`,
+        at: reply.createdAt,
+        target: `project/${post.projectId}/board`,
+      });
+    }
+  }
+
+  for (const todo of state.todos) {
+    if (todo.done && todo.completedAt) {
+      items.push({
+        id: `act-todo-${todo.id}`,
+        projectId: todo.projectId,
+        actorId: todo.assigneeId || state.currentUserId,
+        text: `completed “${todo.title}”`,
+        at: todo.completedAt,
+        target: `project/${todo.projectId}/todos`,
+      });
+    }
+  }
+
+  for (const chat of state.chats) {
+    items.push({
+      id: `act-chat-${chat.id}`,
+      projectId: chat.projectId,
+      actorId: chat.authorId,
+      text: "sent a message in the campfire",
+      detail: chat.body.slice(0, 110),
+      at: chat.createdAt,
+      target: `project/${chat.projectId}/campfire`,
+    });
+  }
+
+  for (const doc of state.docs) {
+    items.push({
+      id: `act-doc-${doc.id}`,
+      projectId: doc.projectId,
+      actorId: state.currentUserId,
+      text: `added ${doc.kind === "link" ? "a link" : doc.kind === "doc" ? "a document" : "a file"} “${doc.name}”`,
+      at: doc.createdAt,
+      target: `project/${doc.projectId}/files`,
+    });
+  }
+
+  for (const card of state.cards) {
+    items.push({
+      id: `act-card-${card.id}`,
+      projectId: card.projectId,
+      actorId: card.assigneeId || state.currentUserId,
+      text: `added “${card.title}” to the card table`,
+      at: card.createdAt,
+      target: `project/${card.projectId}/cards`,
+    });
+  }
+
+  for (const event of state.events) {
+    items.push({
+      id: `act-event-${event.id}`,
+      projectId: event.projectId,
+      actorId: state.currentUserId,
+      text: `scheduled “${event.title}”`,
+      at: event.createdAt,
+      target: `project/${event.projectId}/schedule`,
+    });
+  }
+
+  return items
+    .filter((item) => Boolean(item.at))
+    .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+    .slice(0, limit);
+}
+
+/** My assignments: open to-dos for the current user plus cards assigned to them. */
+export function myAssignments(state: WorkspaceState): { todos: Todo[]; cards: Card[] } {
+  const me = state.currentUserId;
+  return {
+    todos: state.todos.filter((todo) => !todo.done && (todo.assigneeId === me || todo.assigneeId === "")),
+    cards: state.cards.filter((card) => card.assigneeId === me),
+  };
+}
+
+export function overdueTodos(state: WorkspaceState): Todo[] {
+  return state.todos.filter((todo) => !todo.done && isOverdue(todo.due));
+}
+
+export function upcomingEvents(state: WorkspaceState, limit = 8): EventItem[] {
+  return [...state.events]
+    .filter((event) => (daysUntil(event.date) ?? -999) >= 0)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, limit);
+}
+
+/* ------------------------------------------------------------------ */
+/* Persistence                                                         */
+/* ------------------------------------------------------------------ */
+
+export function loadState(): WorkspaceState | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as WorkspaceState;
+    if (!parsed || parsed.version !== 2 || !Array.isArray(parsed.projects)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function saveState(state: WorkspaceState): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // A full quota must not break the UI; the change simply stays in memory.
+  }
+}
+
+export function clearState(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function exportState(state: WorkspaceState): string {
+  return JSON.stringify(state, null, 2);
+}
+
+export function importState(json: string): WorkspaceState {
+  const parsed = JSON.parse(json) as WorkspaceState;
+  if (!parsed || parsed.version !== 2 || !Array.isArray(parsed.projects)) {
+    throw new Error("That file is not a Jojuni workspace backup.");
+  }
+  return parsed;
+}
+
+/* ------------------------------------------------------------------ */
+/* Initial content                                                     */
+/* ------------------------------------------------------------------ */
+
+const OWNER = "person-owner";
+const ADA = "person-ada";
+const EMEKA = "person-emeka";
+const KENE = "person-kene";
+const BOLA = "person-bola";
+
+/**
+ * Starting content.
+ *
+ * Every date is generated relative to "now" so the workspace never opens on a
+ * stale calendar. Project names match the ones already published on the
+ * marketing site; no client detail beyond that is invented here.
+ */
+export function createInitialState(): WorkspaceState {
+  const projects: Project[] = [
+    {
+      id: "project-meridian",
+      name: "Meridian Commerce",
+      code: "MC",
+      client: "Meridian Retail",
+      description: "Storefront and checkout rebuild, with a catalogue the marketing team can edit themselves.",
+      color: "#d90429",
+      start: dateDaysFromNow(-64),
+      end: dateDaysFromNow(24),
+      status: "active",
+      members: [OWNER, ADA, KENE, EMEKA],
+      clientVisible: true,
+      createdAt: isoDaysAgo(64),
+    },
+    {
+      id: "project-northstar",
+      name: "Northstar Mobile",
+      code: "NM",
+      client: "Northstar Health",
+      description: "Patient follow-up app for private clinics: reminders, visit history and secure messaging.",
+      color: "#111111",
+      start: dateDaysFromNow(-38),
+      end: dateDaysFromNow(52),
+      status: "active",
+      members: [OWNER, KENE, BOLA],
+      clientVisible: true,
+      createdAt: isoDaysAgo(38),
+    },
+    {
+      id: "project-automation",
+      name: "Jojuni Automation",
+      code: "JA",
+      client: "Internal",
+      description: "Our own delivery workspace: project boards, client files and reporting in one place.",
+      color: "#6f6f6f",
+      start: dateDaysFromNow(-120),
+      end: dateDaysFromNow(10),
+      status: "active",
+      members: [OWNER, ADA, BOLA],
+      clientVisible: false,
+      createdAt: isoDaysAgo(120),
+    },
+    {
+      id: "project-website",
+      name: "Website Care",
+      code: "WC",
+      client: "Retainer",
+      description: "Monthly maintenance, monitoring and content updates for client sites on retainer.",
+      color: "#0f766e",
+      start: dateDaysFromNow(-200),
+      end: dateDaysFromNow(160),
+      status: "active",
+      members: [OWNER, EMEKA],
+      clientVisible: false,
+      createdAt: isoDaysAgo(200),
+    },
+  ];
+
+  const todoLists: TodoList[] = [
+    { id: "list-mc-build", projectId: "project-meridian", title: "Checkout rebuild", createdAt: isoDaysAgo(40) },
+    { id: "list-mc-launch", projectId: "project-meridian", title: "Launch checklist", createdAt: isoDaysAgo(30) },
+    { id: "list-nm-build", projectId: "project-northstar", title: "Build sprint", createdAt: isoDaysAgo(20) },
+    { id: "list-ja-ops", projectId: "project-automation", title: "Internal operations", createdAt: isoDaysAgo(90) },
+    { id: "list-wc-run", projectId: "project-website", title: "Monthly run", createdAt: isoDaysAgo(20) },
+  ];
+
+  const todos: Todo[] = [
+    {
+      id: "todo-1",
+      listId: "list-mc-build",
+      projectId: "project-meridian",
+      title: "Finalise checkout error states",
+      assigneeId: KENE,
+      due: dateDaysFromNow(1),
+      done: false,
+      notes: "Cover declined card, expired session and out-of-stock race conditions.",
+      subtasks: [
+        { id: "sub-1", title: "Declined card copy", done: true },
+        { id: "sub-2", title: "Expired session redirect", done: false },
+        { id: "sub-3", title: "Out-of-stock guard", done: false },
+      ],
+      createdAt: isoDaysAgo(6),
+    },
+    {
+      id: "todo-2",
+      listId: "list-mc-build",
+      projectId: "project-meridian",
+      title: "Connect payment webhook",
+      assigneeId: BOLA,
+      due: dateDaysFromNow(-3),
+      done: false,
+      notes: "Retry on 5xx, and record every event id so replays are idempotent.",
+      subtasks: [],
+      createdAt: isoDaysAgo(12),
+    },
+    {
+      id: "todo-3",
+      listId: "list-mc-build",
+      projectId: "project-meridian",
+      title: "Catalogue import for the marketing team",
+      assigneeId: ADA,
+      due: dateDaysFromNow(4),
+      done: false,
+      notes: "",
+      subtasks: [{ id: "sub-4", title: "Sample spreadsheet", done: true }],
+      createdAt: isoDaysAgo(9),
+    },
+    {
+      id: "todo-4",
+      listId: "list-mc-launch",
+      projectId: "project-meridian",
+      title: "Run staging release checklist",
+      assigneeId: OWNER,
+      due: dateDaysFromNow(2),
+      done: false,
+      notes: "",
+      subtasks: [
+        { id: "sub-5", title: "Migrations applied", done: true },
+        { id: "sub-6", title: "Rollback rehearsed", done: false },
+      ],
+      createdAt: isoDaysAgo(5),
+    },
+    {
+      id: "todo-5",
+      listId: "list-mc-launch",
+      projectId: "project-meridian",
+      title: "Usability test notes written up",
+      assigneeId: KENE,
+      due: dateDaysFromNow(-8),
+      done: true,
+      completedAt: isoDaysAgo(8),
+      notes: "",
+      subtasks: [],
+      createdAt: isoDaysAgo(20),
+    },
+    {
+      id: "todo-6",
+      listId: "list-mc-launch",
+      projectId: "project-meridian",
+      title: "Client sign-off on checkout flow",
+      assigneeId: OWNER,
+      due: dateDaysFromNow(-1),
+      done: true,
+      completedAt: isoDaysAgo(1),
+      notes: "",
+      subtasks: [],
+      createdAt: isoDaysAgo(15),
+    },
+    {
+      id: "todo-7",
+      listId: "list-nm-build",
+      projectId: "project-northstar",
+      title: "Appointment reminder service",
+      assigneeId: BOLA,
+      due: dateDaysFromNow(6),
+      done: false,
+      notes: "Runs every 15 minutes; quiet hours respected per clinic.",
+      subtasks: [{ id: "sub-7", title: "Timezone handling", done: false }],
+      createdAt: isoDaysAgo(7),
+    },
+    {
+      id: "todo-8",
+      listId: "list-nm-build",
+      projectId: "project-northstar",
+      title: "Onboarding flow prototype",
+      assigneeId: KENE,
+      due: dateDaysFromNow(3),
+      done: false,
+      notes: "",
+      subtasks: [],
+      createdAt: isoDaysAgo(11),
+    },
+    {
+      id: "todo-9",
+      listId: "list-nm-build",
+      projectId: "project-northstar",
+      title: "Clinic admin interview notes",
+      assigneeId: OWNER,
+      due: dateDaysFromNow(-12),
+      done: true,
+      completedAt: isoDaysAgo(12),
+      notes: "",
+      subtasks: [],
+      createdAt: isoDaysAgo(25),
+    },
+    {
+      id: "todo-10",
+      listId: "list-ja-ops",
+      projectId: "project-automation",
+      title: "Weekly reporting time down to one hour",
+      assigneeId: ADA,
+      due: dateDaysFromNow(9),
+      done: false,
+      notes: "",
+      subtasks: [],
+      createdAt: isoDaysAgo(4),
+    },
+    {
+      id: "todo-11",
+      listId: "list-ja-ops",
+      projectId: "project-automation",
+      title: "Retire the old spreadsheet tracker",
+      assigneeId: ADA,
+      due: dateDaysFromNow(-20),
+      done: true,
+      completedAt: isoDaysAgo(20),
+      notes: "",
+      subtasks: [],
+      createdAt: isoDaysAgo(70),
+    },
+    {
+      id: "todo-12",
+      listId: "list-wc-run",
+      projectId: "project-website",
+      title: "Monthly uptime and backup report",
+      assigneeId: EMEKA,
+      due: dateDaysFromNow(5),
+      done: false,
+      notes: "",
+      subtasks: [],
+      createdAt: isoDaysAgo(2),
+    },
+  ];
+
+  const posts: Post[] = [
+    {
+      id: "post-1",
+      projectId: "project-meridian",
+      title: "Checkout rebuild is ready for review",
+      body:
+        "The new checkout is on staging and the full path works end to end: cart, address, payment, confirmation.\n\nThe error states still need copy review before we open it to the client. Everything else is ready for anyone who wants to click through.",
+      authorId: OWNER,
+      category: "Announcement",
+      pinned: true,
+      clientVisible: true,
+      createdAt: isoDaysAgo(2),
+      replies: [
+        {
+          id: "reply-1",
+          authorId: KENE,
+          body: "Clicked through this morning. The declined-card message is still the placeholder — I'll have wording by tomorrow.",
+          createdAt: isoDaysAgo(2, 11),
+        },
+        {
+          id: "reply-2",
+          authorId: ADA,
+          body: "Nice. I've added the remaining copy items to the launch checklist so they don't get lost.",
+          createdAt: isoDaysAgo(1, 10),
+        },
+      ],
+    },
+    {
+      id: "post-2",
+      projectId: "project-meridian",
+      title: "Decision: we are keeping the one-page checkout",
+      body:
+        "We compared the two-step version against the single page with the team on Monday. Staying with one page — fewer drop-offs in testing and less to maintain.\n\nRecorded here so we do not reopen it next quarter.",
+      authorId: OWNER,
+      category: "Discussion",
+      pinned: false,
+      clientVisible: true,
+      createdAt: isoDaysAgo(9),
+      replies: [],
+    },
+    {
+      id: "post-3",
+      projectId: "project-northstar",
+      title: "Kickoff notes and what we heard from clinics",
+      body:
+        "Three clinic managers, same three complaints: reminders arrive late, visit history is scattered, and nobody trusts a chat tool that is not the one they already use.\n\nOur answer is reminders on a schedule they control, one timeline per patient, and messages that stay inside the app.",
+      authorId: ADA,
+      category: "Announcement",
+      pinned: false,
+      clientVisible: true,
+      createdAt: isoDaysAgo(16),
+      replies: [
+        {
+          id: "reply-3",
+          authorId: OWNER,
+          body: "Good summary. Let's not over-promise on the chat side — secure messaging is the hard part.",
+          createdAt: isoDaysAgo(15, 14),
+        },
+      ],
+    },
+    {
+      id: "post-4",
+      projectId: "project-automation",
+      title: "This workspace replaces three tools",
+      body:
+        "Project boards, client files and the weekly report now live here. That is spreadsheets, a chat thread and a shared drive folder done.\n\nIf something is still living outside, say so and we will move it in.",
+      authorId: OWNER,
+      category: "Announcement",
+      pinned: false,
+      clientVisible: false,
+      createdAt: isoDaysAgo(21),
+      replies: [],
+    },
+    {
+      id: "post-5",
+      projectId: "project-website",
+      title: "Retainer schedule for this month",
+      body: "Backups verified, uptime at target, two content updates requested and done. Report attached in Docs & Files.",
+      authorId: EMEKA,
+      category: "Announcement",
+      pinned: false,
+      clientVisible: false,
+      createdAt: isoDaysAgo(3),
+      replies: [],
+    },
+  ];
+
+  const chats: ChatMessage[] = [
+    { id: "chat-1", projectId: "project-meridian", authorId: ADA, body: "Morning — staging is up if anyone wants to click the new checkout.", createdAt: isoDaysAgo(1, 8) },
+    { id: "chat-2", projectId: "project-meridian", authorId: KENE, body: "On it after standup. The error copy is the last thing I owe you.", createdAt: isoDaysAgo(1, 9) },
+    { id: "chat-3", projectId: "project-meridian", authorId: OWNER, body: "Reminder that the client review is Thursday, so let's have copy locked tomorrow.", createdAt: isoDaysAgo(1, 10) },
+    { id: "chat-4", projectId: "project-northstar", authorId: BOLA, body: "Reminder service is running on the staging cron. Quiet hours still behave.", createdAt: isoDaysAgo(2, 13) },
+    { id: "chat-5", projectId: "project-automation", authorId: ADA, body: "I moved the last of the tracker into the card table. Nothing left in the sheet.", createdAt: isoDaysAgo(3, 15) },
+  ];
+
+  const events: EventItem[] = [
+    { id: "event-1", projectId: "project-meridian", title: "Client review — checkout", date: dateDaysFromNow(3), time: "10:00", kind: "Meeting", createdAt: isoDaysAgo(3) },
+    { id: "event-2", projectId: "project-meridian", title: "Checkout launch", date: dateDaysFromNow(24), time: "09:00", kind: "Milestone", createdAt: isoDaysAgo(30) },
+    { id: "event-3", projectId: "project-meridian", title: "Copy freeze", date: dateDaysFromNow(1), time: "17:00", kind: "Deadline", createdAt: isoDaysAgo(2) },
+    { id: "event-4", projectId: "project-northstar", title: "Prototype walkthrough", date: dateDaysFromNow(7), time: "14:00", kind: "Meeting", createdAt: isoDaysAgo(5) },
+    { id: "event-5", projectId: "project-northstar", title: "Beta opens to two clinics", date: dateDaysFromNow(52), time: "09:00", kind: "Milestone", createdAt: isoDaysAgo(10) },
+    { id: "event-6", projectId: "project-automation", title: "Automation handover", date: dateDaysFromNow(10), time: "12:00", kind: "Milestone", createdAt: isoDaysAgo(7) },
+    { id: "event-7", projectId: "project-website", title: "Monthly report due", date: dateDaysFromNow(5), time: "16:00", kind: "Deadline", createdAt: isoDaysAgo(1) },
+  ];
+
+  const folders: Folder[] = [
+    { id: "folder-mc-design", projectId: "project-meridian", name: "Design" },
+    { id: "folder-mc-contracts", projectId: "project-meridian", name: "Contracts" },
+    { id: "folder-nm-research", projectId: "project-northstar", name: "Research" },
+    { id: "folder-ja-ops", projectId: "project-automation", name: "Operations" },
+  ];
+
+  const docs: DocFile[] = [
+    {
+      id: "doc-1",
+      projectId: "project-meridian",
+      folderId: "folder-mc-design",
+      name: "Checkout flow — final decisions",
+      kind: "doc",
+      body:
+        "## One page, not two\n\nWe keep the single-page checkout. Fewer drop-offs in testing.\n\n## Error handling\n\n- Declined card: explain, offer retry, keep the cart intact\n- Expired session: return to payment with the cart preserved\n- Out of stock: block the line item, not the order\n\n## Open questions\n\nPayment provider retry window is still unconfirmed.",
+      clientVisible: true,
+      updatedAt: isoDaysAgo(1),
+      createdAt: isoDaysAgo(14),
+    },
+    {
+      id: "doc-2",
+      projectId: "project-meridian",
+      folderId: "folder-mc-design",
+      name: "Storefront moodboard",
+      kind: "link",
+      body: "https://www.jojunitechnologies.com.ng/portfolio",
+      clientVisible: true,
+      updatedAt: isoDaysAgo(20),
+      createdAt: isoDaysAgo(20),
+    },
+    {
+      id: "doc-3",
+      projectId: "project-meridian",
+      folderId: "folder-mc-contracts",
+      name: "Statement of work.pdf",
+      kind: "file",
+      body: "Signed scope, milestones and payment schedule.",
+      clientVisible: false,
+      updatedAt: isoDaysAgo(60),
+      createdAt: isoDaysAgo(60),
+    },
+    {
+      id: "doc-4",
+      projectId: "project-northstar",
+      folderId: "folder-nm-research",
+      name: "Clinic interviews — themes",
+      kind: "doc",
+      body:
+        "## What keeps coming up\n\n1. Reminders arrive too late to be useful\n2. Visit history is split across paper and two systems\n3. Nobody wants another chat app they have to check\n\n## What we are not doing\n\nBuilding a full clinical record system. This is follow-up only.",
+      clientVisible: true,
+      updatedAt: isoDaysAgo(12),
+      createdAt: isoDaysAgo(18),
+    },
+    {
+      id: "doc-5",
+      projectId: "project-automation",
+      folderId: "folder-ja-ops",
+      name: "Weekly reporting checklist",
+      kind: "doc",
+      body: "1. Pull the week's completed to-dos\n2. Note anything overdue and why\n3. Update the client-facing summary\n4. Send before Friday 16:00",
+      clientVisible: false,
+      updatedAt: isoDaysAgo(4),
+      createdAt: isoDaysAgo(40),
+    },
+  ];
+
+  const cardColumns: CardColumn[] = [
+    { id: "col-mc-backlog", projectId: "project-meridian", name: "Backlog", position: 0 },
+    { id: "col-mc-progress", projectId: "project-meridian", name: "In progress", position: 1 },
+    { id: "col-mc-review", projectId: "project-meridian", name: "In review", position: 2 },
+    { id: "col-mc-done", projectId: "project-meridian", name: "Done", position: 3 },
+    { id: "col-nm-backlog", projectId: "project-northstar", name: "Backlog", position: 0 },
+    { id: "col-nm-progress", projectId: "project-northstar", name: "In progress", position: 1 },
+    { id: "col-nm-done", projectId: "project-northstar", name: "Done", position: 2 },
+  ];
+
+  const cards: Card[] = [
+    { id: "card-1", projectId: "project-meridian", columnId: "col-mc-backlog", title: "Gift card support", notes: "Requested by the client. Not in the current scope.", assigneeId: "", due: "", createdAt: isoDaysAgo(15) },
+    { id: "card-2", projectId: "project-meridian", columnId: "col-mc-backlog", title: "Saved addresses", notes: "", assigneeId: KENE, due: dateDaysFromNow(14), createdAt: isoDaysAgo(13) },
+    { id: "card-3", projectId: "project-meridian", columnId: "col-mc-progress", title: "Payment retry handling", notes: "Idempotent event ids so replays do not double-charge.", assigneeId: BOLA, due: dateDaysFromNow(2), createdAt: isoDaysAgo(8) },
+    { id: "card-4", projectId: "project-meridian", columnId: "col-mc-review", title: "Declined card copy", notes: "", assigneeId: KENE, due: dateDaysFromNow(1), createdAt: isoDaysAgo(5) },
+    { id: "card-5", projectId: "project-meridian", columnId: "col-mc-done", title: "Address validation", notes: "", assigneeId: BOLA, due: "", createdAt: isoDaysAgo(22) },
+    { id: "card-6", projectId: "project-northstar", columnId: "col-nm-backlog", title: "Multi-clinic admin roles", notes: "", assigneeId: "", due: "", createdAt: isoDaysAgo(10) },
+    { id: "card-7", projectId: "project-northstar", columnId: "col-nm-progress", title: "Reminder quiet hours", notes: "", assigneeId: BOLA, due: dateDaysFromNow(6), createdAt: isoDaysAgo(7) },
+    { id: "card-8", projectId: "project-northstar", columnId: "col-nm-done", title: "Patient timeline view", notes: "", assigneeId: KENE, due: "", createdAt: isoDaysAgo(19) },
+  ];
+
+  const hill: HillScope[] = [
+    { id: "hill-1", projectId: "project-meridian", label: "Checkout flow", progress: 82 },
+    { id: "hill-2", projectId: "project-meridian", label: "Catalogue import", progress: 38 },
+    { id: "hill-3", projectId: "project-meridian", label: "Payment integration", progress: 61 },
+    { id: "hill-4", projectId: "project-meridian", label: "Launch runbook", progress: 12 },
+    { id: "hill-5", projectId: "project-northstar", label: "Reminders", progress: 44 },
+    { id: "hill-6", projectId: "project-northstar", label: "Secure messaging", progress: 18 },
+    { id: "hill-7", projectId: "project-northstar", label: "Onboarding", progress: 55 },
+    { id: "hill-8", projectId: "project-automation", label: "Reporting", progress: 74 },
+  ];
+
+  const checkins: Checkin[] = [
+    {
+      id: "checkin-1",
+      projectId: "project-meridian",
+      prompt: "What did you work on this week?",
+      schedule: "Every Monday at 9:00",
+      answers: [
+        { id: "ans-1", authorId: KENE, body: "Error states and the declined-card copy. Staging is ready to click through.", createdAt: isoDaysAgo(2, 9) },
+        { id: "ans-2", authorId: BOLA, body: "Webhook retries, and I wrote down every event id we receive so replays are safe.", createdAt: isoDaysAgo(2, 10) },
+      ],
+    },
+    {
+      id: "checkin-2",
+      projectId: "project-meridian",
+      prompt: "Anything blocking you?",
+      schedule: "Every Friday at 15:00",
+      answers: [
+        { id: "ans-3", authorId: ADA, body: "Waiting on the client's product feed before the catalogue import can finish.", createdAt: isoDaysAgo(3, 15) },
+      ],
+    },
+    {
+      id: "checkin-3",
+      projectId: "project-northstar",
+      prompt: "What are you working on this week?",
+      schedule: "Every Monday at 9:00",
+      answers: [
+        { id: "ans-4", authorId: BOLA, body: "Reminder service scheduling and the quiet-hours rules.", createdAt: isoDaysAgo(1, 9) },
+      ],
+    },
+  ];
+
+  const notes: Note[] = [
+    {
+      id: "note-1",
+      title: "Questions to ask every new client",
+      body: "1. Who answers when something breaks at 22:00?\n2. What does success look like in numbers?\n3. What system are we replacing, and who still relies on it?\n4. Who has sign-off, and who only thinks they do?",
+      updatedAt: isoDaysAgo(6),
+    },
+    {
+      id: "note-2",
+      title: "Weekly review prompts",
+      body: "What shipped?\nWhat slipped, and was it our fault?\nWhat are we pretending not to know?",
+      updatedAt: isoDaysAgo(13),
+    },
+  ];
+
+  const bookmarks: Bookmark[] = [
+    { id: "bm-1", label: "Checkout launch checklist", target: "project/project-meridian/todos", createdAt: isoDaysAgo(4) },
+    { id: "bm-2", label: "Clinic interview notes", target: "project/project-northstar/files", createdAt: isoDaysAgo(11) },
+  ];
+
+  const ledger: LedgerEntry[] = [
+    { id: "led-1", date: dateDaysFromNow(-2), description: "Meridian milestone payment", category: "Client income", type: "Income", amount: 2850000 },
+    { id: "led-2", date: dateDaysFromNow(-3), description: "Cloud infrastructure", category: "Infrastructure", type: "Expense", amount: 186500 },
+    { id: "led-3", date: dateDaysFromNow(-6), description: "Northstar discovery deposit", category: "Client income", type: "Income", amount: 1200000 },
+    { id: "led-4", date: dateDaysFromNow(-8), description: "Design software licences", category: "Software", type: "Expense", amount: 97000 },
+    { id: "led-5", date: dateDaysFromNow(-11), description: "Contract QA support", category: "Contractors", type: "Expense", amount: 325000 },
+    { id: "led-6", date: dateDaysFromNow(-14), description: "Website care retainers", category: "Recurring income", type: "Income", amount: 680000 },
+  ];
+
+  return {
+    version: 2,
+    currentUserId: OWNER,
+    people: [
+      { id: OWNER, name: "Workspace Owner", initials: "WO", title: "Founder / Super admin", email: "hello@jojunitechnologies.com.ng", color: "#d90429", owner: true },
+      { id: ADA, name: "Ada Madu", initials: "AM", title: "Delivery lead", email: "ada@jojunitechnologies.com.ng", color: "#111111" },
+      { id: EMEKA, name: "Emeka Obi", initials: "EO", title: "Finance & operations", email: "emeka@jojunitechnologies.com.ng", color: "#6f6f6f" },
+      { id: KENE, name: "Kene Ibe", initials: "KI", title: "Product designer", email: "kene@jojunitechnologies.com.ng", color: "#0f766e" },
+      { id: BOLA, name: "Bola Nnaji", initials: "BN", title: "Engineer", email: "bola@jojunitechnologies.com.ng", color: "#7c3aed" },
+    ],
+    projects,
+    todoLists,
+    todos,
+    posts,
+    chats,
+    events,
+    folders,
+    docs,
+    cardColumns,
+    cards,
+    hill,
+    checkins,
+    notes,
+    bookmarks,
+    ledger,
+  };
+}
