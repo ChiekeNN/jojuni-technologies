@@ -39,6 +39,15 @@ import {
   type WorkspaceState,
 } from "./model";
 import {
+  hydrate as hydrateChat,
+  pushDelete as pushChatDelete,
+  pushEdit as pushChatEdit,
+  pushMembers as pushChatMembers,
+  pushMessage as pushChatMessage,
+  pushReactions as pushChatReactions,
+  pushThread as pushChatThread,
+} from "./chat-backend";
+import {
   canDeleteMessage,
   canEditMessage,
   canSeeThread,
@@ -371,6 +380,7 @@ export function useWorkspaceStore(): WorkspaceStore {
           createdAt: now(),
         };
         commit((s) => ({ ...s, chat: { ...s.chat, threads: [...s.chat.threads, thread] } }));
+        void pushChatThread(thread);
         return thread.id;
       },
 
@@ -403,10 +413,13 @@ export function useWorkspaceStore(): WorkspaceStore {
             messages: [...s.chat.messages, systemMessage],
           },
         }));
+        void pushChatThread(thread);
+        void pushChatMessage(systemMessage);
         return thread.id;
       },
 
-      updateGroup: (threadId, patch) =>
+      updateGroup: (threadId, patch) => {
+        if (patch.memberIds) void pushChatMembers(threadId, patch.memberIds);
         commit((s) => ({
           ...s,
           chat: {
@@ -424,7 +437,8 @@ export function useWorkspaceStore(): WorkspaceStore {
                 : thread,
             ),
           },
-        })),
+        }));
+      },
 
       leaveGroup: (threadId) =>
         commit((s) => ({
@@ -469,21 +483,25 @@ export function useWorkspaceStore(): WorkspaceStore {
             reads: { ...s.chat.reads, [readKey(me(), threadId)]: message.createdAt },
           },
         }));
+        void pushChatMessage(message);
         return message.id;
       },
 
-      editMessage: (messageId, body) =>
+      editMessage: (messageId, body) => {
+        const editedAt = now();
+        void pushChatEdit(messageId, body, editedAt);
         commit((s) => ({
           ...s,
           chat: {
             ...s.chat,
             messages: s.chat.messages.map((message) =>
               message.id === messageId && canEditMessage(message, me())
-                ? { ...message, body, editedAt: now() }
+                ? { ...message, body, editedAt }
                 : message,
             ),
           },
-        })),
+        }));
+      },
 
       deleteMessage: (messageId) => {
         const person = stateRef.current.people.find((p) => p.id === me());
@@ -491,20 +509,37 @@ export function useWorkspaceStore(): WorkspaceStore {
         // Checked here as well as in the UI: the rule has to hold wherever the
         // action is called from, not just where a button happens to be hidden.
         if (!target || !canDeleteMessage(target, person, me())) return;
+        const deletedAt = now();
+        void pushChatDelete(messageId, me(), deletedAt);
         commit((s) => ({
           ...s,
           chat: {
             ...s.chat,
             messages: s.chat.messages.map((message) =>
               message.id === messageId
-                ? { ...message, deletedAt: now(), deletedBy: me(), body: "", attachments: [], reactions: [] }
+                ? { ...message, deletedAt, deletedBy: me(), body: "", attachments: [], reactions: [] }
                 : message,
             ),
           },
         }));
       },
 
-      toggleReaction: (messageId, emoji) =>
+      toggleReaction: (messageId, emoji) => {
+        // Recomputed below in the reducer; the database gets the same shape.
+        const snapshot = (() => {
+          const message = stateRef.current.chat.messages.find((item) => item.id === messageId);
+          if (!message || message.deletedAt) return null;
+          const existing = message.reactions.find((reaction) => reaction.emoji === emoji);
+          if (!existing) return [...message.reactions, { emoji, personIds: [me()] }];
+          const mineAlready = existing.personIds.includes(me());
+          const personIds = mineAlready
+            ? existing.personIds.filter((id) => id !== me())
+            : [...existing.personIds, me()];
+          return message.reactions
+            .map((reaction) => (reaction.emoji === emoji ? { ...reaction, personIds } : reaction))
+            .filter((reaction) => reaction.personIds.length > 0);
+        })();
+        if (snapshot) void pushChatReactions(messageId, snapshot);
         commit((s) => ({
           ...s,
           chat: {
@@ -528,7 +563,8 @@ export function useWorkspaceStore(): WorkspaceStore {
               };
             }),
           },
-        })),
+        }));
+      },
 
       markRead: (threadId) =>
         commit((s) => {
@@ -710,6 +746,47 @@ export function useWorkspaceStore(): WorkspaceStore {
     },
     [],
   );
+
+  /**
+   * Pull the chat down from the database, once.
+   *
+   * Read-only against the UI until it succeeds: a build with no database, a
+   * missing session or an unapplied schema all leave the local chat exactly
+   * where it was. Database threads win where ids collide, because the database
+   * is the shared truth and the local copy is one browser's stale view.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    void hydrateChat().then((result) => {
+      if (cancelled || !result) return;
+      if (!result.chat.threads.length) return;
+      setState((current) => {
+        const dbIds = new Set(result.chat.threads.map((thread) => thread.id));
+        const localOnly = current.chat.threads.filter((thread) => !dbIds.has(thread.id));
+        const dbMessageIds = new Set(result.chat.messages.map((message) => message.id));
+        const localOnlyMessages = current.chat.messages.filter(
+          (message) =>
+            !dbMessageIds.has(message.id) && localOnly.some((thread) => thread.id === message.chatId),
+        );
+        const next: WorkspaceState = {
+          ...current,
+          chat: {
+            threads: [...result.chat.threads, ...localOnly],
+            messages: [...result.chat.messages, ...localOnlyMessages],
+            // Read markers and pins are per-browser conveniences, not shared
+            // facts, so the local ones are kept.
+            reads: current.chat.reads,
+            pins: current.chat.pins,
+          },
+        };
+        saveState(next);
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Keep two tabs of the workspace in step.
   useEffect(() => {
