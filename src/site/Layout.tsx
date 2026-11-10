@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowUpRight, Mail, MapPin, Menu, Phone, Clock3, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { contactInfo, navItems, telHref } from "./content";
+import { companyInfo, contactInfo, navItems, telHref } from "./content";
 import { SiteLink, useRouter } from "./router";
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -94,7 +94,14 @@ export function Layout({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="flex flex-col gap-3 pt-7 text-xs text-white/40 sm:flex-row sm:items-center sm:justify-between">
-            <p>Copyright {new Date().getFullYear()} Jojuni Technologies.</p>
+            <div className="space-y-1">
+              <p>
+                © {new Date().getFullYear()} {companyInfo.legalName}. All rights reserved.
+              </p>
+              <p className="text-white/30">
+                Registered in Nigeria · CAC {companyInfo.registration}
+              </p>
+            </div>
             <div className="flex items-center gap-6">
               <a href="/workspace" className="hover:text-[#d90429]">Team workspace</a>
               <p>Built for dependable progress.</p>
