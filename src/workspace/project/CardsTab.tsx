@@ -5,7 +5,7 @@ import { useState } from "react";
 import { GripVertical, Plus, Trash2, X } from "lucide-react";
 
 import { useWorkspace } from "../store";
-import { dueLabel, isOverdue, relativeTime, type Card, type ID } from "../model";
+import { assignablePeople, dueLabel, isOverdue, relativeTime, type Card, type ID } from "../model";
 import { Avatar, Button, Field, IconButton, Modal, Select, TextArea, TextInput, cx } from "../ui";
 
 export function CardsTab({ projectId }: { projectId: ID }) {
@@ -23,7 +23,7 @@ export function CardsTab({ projectId }: { projectId: ID }) {
     .sort((a, b) => a.position - b.position);
   const cards = state.cards.filter((card) => card.projectId === projectId);
   const project = state.projects.find((item) => item.id === projectId);
-  const members = state.people.filter((person) => project?.members.includes(person.id));
+  const members = assignablePeople(state.people).filter((person) => project?.members.includes(person.id));
   const activeCard = state.cards.find((card) => card.id === openCard) ?? null;
 
   const drop = (columnId: ID) => {

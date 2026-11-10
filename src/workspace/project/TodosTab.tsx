@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { Check, ChevronDown, GripVertical, Plus, Trash2 } from "lucide-react";
 
 import { useWorkspace } from "../store";
-import { dueLabel, isOverdue, type ID, type Todo } from "../model";
+import { assignablePeople, dueLabel, isOverdue, type ID, type Todo } from "../model";
 import { Avatar, Button, Field, IconButton, Select, TextInput, cx } from "../ui";
 
 type Filter = "all" | "mine" | "open" | "done" | "overdue";
@@ -18,7 +18,7 @@ export function TodosTab({ projectId }: { projectId: ID }) {
 
   const lists = state.todoLists.filter((list) => list.projectId === projectId);
   const project = state.projects.find((item) => item.id === projectId);
-  const members = state.people.filter((person) => project?.members.includes(person.id));
+  const members = assignablePeople(state.people).filter((person) => project?.members.includes(person.id));
 
   const todos = useMemo(() => {
     const base = state.todos.filter((todo) => todo.projectId === projectId);

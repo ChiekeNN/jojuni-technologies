@@ -857,7 +857,7 @@ function PeopleModal({
     <Modal open onClose={onClose} title="Message a colleague">
       <div className="space-y-1">
         {people
-          .filter((person) => person.id !== me)
+          .filter((person) => person.id !== me && (person.category ?? "staff") === "staff")
           .map((person) => (
             <button
               key={person.id}

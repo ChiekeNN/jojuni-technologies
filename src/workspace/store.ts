@@ -76,6 +76,8 @@ interface Actions {
   /* people */
   updatePerson: (id: ID, patch: Partial<Person>) => void;
   addPerson: (person: Omit<Person, "id">) => void;
+  /** Removes the person and takes them off every project; their work stays. */
+  deletePerson: (id: ID) => void;
 
   /* projects */
   addProject: (project: Omit<Project, "id" | "createdAt">) => ID;
@@ -192,6 +194,20 @@ export function useWorkspaceStore(): WorkspaceStore {
       /* ---------------- people ---------------- */
       updatePerson: (id, patch) =>
         commit((s) => ({ ...s, people: s.people.map((p) => (p.id === id ? { ...p, ...patch } : p)) })),
+
+      deletePerson: (id) =>
+        commit((s) => ({
+          ...s,
+          people: s.people.filter((person) => person.id !== id),
+          projects: s.projects.map((project) => ({
+            ...project,
+            members: project.members.filter((memberId) => memberId !== id),
+          })),
+          // Unassign rather than delete the work: losing a to-do because its
+          // owner left would be a far worse bug than an unassigned one.
+          todos: s.todos.map((todo) => (todo.assigneeId === id ? { ...todo, assigneeId: "" } : todo)),
+          cards: s.cards.map((card) => (card.assigneeId === id ? { ...card, assigneeId: "" } : card)),
+        })),
 
       addPerson: (person) =>
         commit((s) => ({ ...s, people: [...s.people, { ...person, id: uid("person") }] })),
