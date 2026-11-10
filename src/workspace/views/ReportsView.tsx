@@ -151,7 +151,7 @@ export function FinancePanel() {
       .filter(
         (entry) =>
           !needle ||
-          `${entry.description} ${entry.category} ${entry.service ?? ""} ${entry.serviceItem ?? ""}`
+          `${entry.description} ${entry.category} ${entry.service ?? ""} ${entry.serviceItem ?? ""} ${entry.counterparty ?? ""} ${entry.method ?? ""}`
             .toLowerCase()
             .includes(needle),
       )
@@ -390,16 +390,24 @@ export function FinancePanel() {
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-xs font-semibold text-black/80">{entry.description}</span>
-                <span className="flex items-center gap-1 text-[10px] text-black/35">
-                  <span>{formatDate(entry.date, true)} · {entry.category}</span>
+                {/* Wraps rather than overflows: at 390px a long bank name plus a
+                    payer name is wider than the row. */}
+                <span className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[10px] text-black/35">
+                  <span className="whitespace-nowrap">{formatDate(entry.date, true)} · {entry.category}</span>
+                  {entry.counterparty && (
+                    <span className="max-w-full truncate text-black/45">· {entry.counterparty}</span>
+                  )}
                   {entry.service && (
-                    <span className="truncate rounded bg-black/5 px-1 py-px font-semibold text-black/50">
+                    <span className="max-w-full truncate rounded bg-black/5 px-1 py-px font-semibold text-black/50">
                       {entry.serviceItem ?? entry.service}
                     </span>
                   )}
+                  {entry.method && entry.method !== entry.bank && (
+                    <span className="rounded bg-black/5 px-1 py-px text-black/45">{entry.method}</span>
+                  )}
                   {entry.bank && (
                     <span
-                      className="flex shrink-0 items-center gap-1 rounded px-1 py-px font-semibold"
+                      className="flex max-w-full items-center gap-1 rounded px-1 py-px font-semibold"
                       style={{ color: bankByName(entry.bank)?.color ?? "#525252" }}
                       title={entry.type === "Income" ? `Paid into ${entry.bank}` : `Paid from ${entry.bank}`}
                     >
@@ -585,6 +593,25 @@ export function FinancePanel() {
               <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-black/35">Description</p>
               <p className="text-base font-semibold leading-snug text-black">{viewing.description}</p>
             </div>
+            {(viewing.counterparty || viewing.method) && (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {viewing.counterparty && (
+                  <div className="rounded border border-black/8 bg-black/[0.02] px-3 py-2">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-black/35">
+                      {viewing.type === "Income" ? "Paid by" : "Paid to"}
+                    </p>
+                    <p className="text-sm font-semibold text-black">{viewing.counterparty}</p>
+                  </div>
+                )}
+                {viewing.method && (
+                  <div className="rounded border border-black/8 bg-black/[0.02] px-3 py-2">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-black/35">How it moved</p>
+                    <p className="text-sm font-semibold text-black">{viewing.method}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {viewing.bank && (
               <div className="flex items-center gap-2 rounded border border-black/8 bg-black/[0.02] px-3 py-2">
                 <span
@@ -723,6 +750,8 @@ function EntryForm({
   const [bank, setBank] = useState(
     initial?.bank ?? (initial?.type === "Expense" ? "" : INCOME_BANKS[0]?.name ?? ""),
   );
+  const [method, setMethod] = useState(initial?.method ?? "");
+  const [counterparty, setCounterparty] = useState(initial?.counterparty ?? "");
   const [error, setError] = useState<string | null>(null);
 
   const subItems = service ? itemsForService(service) : [];
@@ -766,6 +795,8 @@ function EntryForm({
       serviceItem: isIncome && serviceItem ? serviceItem : undefined,
       projectId: projectId || undefined,
       bank,
+      method: method || undefined,
+      counterparty: counterparty.trim() || undefined,
     });
   };
 
@@ -837,6 +868,32 @@ function EntryForm({
               </option>
             ))}
           </Select>
+        </Field>
+      </div>
+
+      <div className="lg:col-span-2">
+        <Field
+          label={isIncome ? "Paid by" : "Paid to"}
+          hint={isIncome ? "The person or company who paid." : "Who received the money."}
+        >
+          <TextInput
+            value={counterparty}
+            onChange={(event) => setCounterparty(event.target.value)}
+            placeholder={isIncome ? "e.g. Western Dada Limited" : "e.g. Fidelity Bank"}
+          />
+        </Field>
+      </div>
+
+      <div className="lg:col-span-2">
+        <Field
+          label="How it moved"
+          hint={method ? undefined : "Optional — OPay, transfer, card, cheque."}
+        >
+          <TextInput
+            value={method}
+            onChange={(event) => setMethod(event.target.value)}
+            placeholder="e.g. OPay, bank transfer"
+          />
         </Field>
       </div>
 
