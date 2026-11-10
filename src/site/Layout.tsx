@@ -64,46 +64,46 @@ export function Layout({ children }: { children: ReactNode }) {
 
       <main>{children}</main>
 
-      <footer className="bg-black px-5 pb-8 pt-16 text-white sm:px-8 lg:px-12">
+      <footer className="bg-white px-5 pb-8 pt-16 text-black sm:px-8 lg:px-12">
         <div className="mx-auto max-w-[1380px]">
-          <div className="grid gap-12 border-b border-white/20 pb-16 md:grid-cols-2 lg:grid-cols-[1.4fr_0.8fr_1fr]">
+          <div className="grid gap-12 border-b border-black/15 pb-16 md:grid-cols-2 lg:grid-cols-[1.4fr_0.8fr_1fr]">
             <div>
               <img src="/logo-official.svg" alt="Jojuni Technologies" className="h-20 w-auto max-w-full sm:h-24" />
-              <p className="mt-5 max-w-md text-sm leading-relaxed text-white/50">
+              <p className="mt-5 max-w-md text-sm leading-relaxed text-black/60">
                 Technology designed, built, and supported with clarity — from Nigeria to the world.
               </p>
             </div>
             <div>
-              <p className="mb-5 text-xs font-bold uppercase tracking-[0.2em] text-white/40">Explore</p>
+              <p className="mb-5 text-xs font-bold uppercase tracking-[0.2em] text-black/40">Explore</p>
               <div className="space-y-3 text-sm">
                 {navItems.map((item) => (
-                  <SiteLink key={item.to} to={item.to} className="block hover:text-[#d90429]">
+                  <SiteLink key={item.to} to={item.to} className="block text-black/75 transition hover:text-[#d90429]">
                     {item.label}
                   </SiteLink>
                 ))}
               </div>
             </div>
             <div>
-              <p className="mb-5 text-xs font-bold uppercase tracking-[0.2em] text-white/40">Contact</p>
-              <div className="space-y-4 text-sm text-white/70">
-                <a href={`mailto:${contactInfo.email}`} className="flex items-center gap-3 hover:text-[#d90429]"><Mail className="h-4 w-4 shrink-0" /> {contactInfo.email}</a>
-                <a href={`tel:${telHref()}`} className="flex items-center gap-3 hover:text-[#d90429]"><Phone className="h-4 w-4 shrink-0" /> {contactInfo.phone}</a>
+              <p className="mb-5 text-xs font-bold uppercase tracking-[0.2em] text-black/40">Contact</p>
+              <div className="space-y-4 text-sm text-black/65">
+                <a href={`mailto:${contactInfo.email}`} className="flex items-center gap-3 transition hover:text-[#d90429]"><Mail className="h-4 w-4 shrink-0" /> {contactInfo.email}</a>
+                <a href={`tel:${telHref()}`} className="flex items-center gap-3 transition hover:text-[#d90429]"><Phone className="h-4 w-4 shrink-0" /> {contactInfo.phone}</a>
                 <p className="flex items-center gap-3"><MapPin className="h-4 w-4 shrink-0" /> {contactInfo.office}</p>
                 <p className="flex items-center gap-3"><Clock3 className="h-4 w-4 shrink-0" /> {contactInfo.hours}</p>
               </div>
             </div>
           </div>
-          <div className="flex flex-col gap-3 pt-7 text-xs text-white/40 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 pt-7 text-xs text-black/55 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <p>
                 © {new Date().getFullYear()} {companyInfo.legalName}. All rights reserved.
               </p>
-              <p className="text-white/30">
+              <p className="text-black/45">
                 Registered in Nigeria · CAC {companyInfo.registration}
               </p>
             </div>
             <div className="flex items-center gap-6">
-              <a href="/workspace" className="hover:text-[#d90429]">Team workspace</a>
+              <a href="/workspace" className="transition hover:text-[#d90429]">Team workspace</a>
               <p>Built for dependable progress.</p>
             </div>
           </div>
