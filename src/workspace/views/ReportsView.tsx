@@ -2,14 +2,22 @@
  * Reports: a high-level read on everything, plus the finance ledger.
  */
 import { useMemo, useState } from "react";
-import { ArrowDownRight, ArrowUpRight, Copy, Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Copy, Download, Eye, FileDown, Pencil, Plus, Search, Trash2 } from "lucide-react";
 
 import { useWorkspace } from "../store";
 import { daysUntil, dueLabel, formatDate, hillForProject, isOverdue, projectProgress, todayISO } from "../model";
 import { Button, Chip, Field, IconButton, Modal, Panel, ProgressBar, Select, TextInput, cx } from "../ui";
 import { formatNaira } from "./HomeView";
-import { SERVICE_OPTIONS, itemsForService } from "../services";
-import { BANKS_SORTED, bankByName } from "../banks";
+import {
+  EXPENSE_CATEGORIES,
+  INCOME_CATEGORIES,
+  NON_SERVICE_INCOME,
+  SERVICE_OPTIONS,
+  isCapitalReason,
+  itemsForService,
+} from "../services";
+import { BANKS_SORTED, INCOME_BANKS, bankByName } from "../banks";
+import { exportLedger, exportSummary } from "../csv";
 import type { LedgerDraft } from "../store";
 
 export function ReportsView({ onOpenProject }: { onOpenProject: (projectId: string) => void }) {
@@ -155,6 +163,9 @@ export function FinancePanel() {
     const map = new Map<string, { total: number; count: number; items: Map<string, number> }>();
     for (const entry of state.ledger) {
       if (entry.type !== "Income" || !entry.service) continue;
+      // Only real services get a bar. Capital and other non-service reasons are
+      // not sales, and showing them here would overstate what was sold.
+      if (!SERVICE_OPTIONS.some((service) => service.title === entry.service)) continue;
       const row = map.get(entry.service) ?? { total: 0, count: 0, items: new Map<string, number>() };
       row.total += entry.amount;
       row.count += 1;
@@ -184,11 +195,16 @@ export function FinancePanel() {
 
   const visibleTotals = visible.reduce(
     (totals, entry) => {
-      if (entry.type === "Income") totals.income += entry.amount;
-      else totals.expense += entry.amount;
+      if (entry.type === "Income") {
+        totals.income += entry.amount;
+        // Capital is an inflow but not revenue — keep the two apart so the
+        // headline does not claim the business earned money it was given.
+        if (isCapitalReason(entry.service)) totals.capital += entry.amount;
+        else totals.revenue += entry.amount;
+      } else totals.expense += entry.amount;
       return totals;
     },
-    { income: 0, expense: 0 },
+    { income: 0, expense: 0, capital: 0, revenue: 0 },
   );
 
   const viewing = state.ledger.find((entry) => entry.id === viewingId) ?? null;
@@ -220,9 +236,25 @@ export function FinancePanel() {
           <ArrowDownRight className="h-2.5 w-2.5" /> {formatNaira(expense)}
         </Chip>
         <Chip tone="dark">Net {formatNaira(income - expense)}</Chip>
-        <Button className="ml-auto" tone="primary" onClick={() => setAdding((value) => !value)}>
-          <Plus className="h-3.5 w-3.5" /> Entry
-        </Button>
+        <div className="ml-auto flex flex-wrap items-center gap-1.5">
+          <Button
+            tone="ghost"
+            onClick={() => exportLedger(visible, state.projects, filtered ? "filtered" : "all")}
+            title={`Download ${visible.length} filtered row${visible.length === 1 ? "" : "s"} as CSV`}
+          >
+            <Download className="h-3.5 w-3.5" /> CSV
+          </Button>
+          <Button
+            tone="ghost"
+            onClick={() => exportSummary(visible, state.projects, filtered ? "filtered" : "all")}
+            title="Download totals by bank, service, category and project"
+          >
+            <FileDown className="h-3.5 w-3.5" /> Summary
+          </Button>
+          <Button tone="primary" onClick={() => setAdding((value) => !value)}>
+            <Plus className="h-3.5 w-3.5" /> Entry
+          </Button>
+        </div>
       </header>
 
       {/* Filters */}
@@ -317,6 +349,7 @@ export function FinancePanel() {
           {filtered
             ? `${visible.length} of ${state.ledger.length} · net ${formatNaira(visibleTotals.income - visibleTotals.expense)}`
             : `${state.ledger.length} entries`}
+          {visibleTotals.capital > 0 && ` · ${formatNaira(visibleTotals.capital)} capital (not revenue)`}
         </span>
       </div>
 
@@ -471,10 +504,10 @@ export function FinancePanel() {
       {byService.length > 0 && (
         <div className="border-t border-black/8 px-4 py-3">
           <div className="mb-2 flex flex-wrap items-baseline gap-2">
-            <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-black/45">Income by service</h3>
+            <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-black/45">Revenue by service</h3>
             <span className="text-[11px] text-black/35">
               {formatNaira(serviceIncome)}
-              {income > serviceIncome && ` · ${formatNaira(income - serviceIncome)} not assigned to a service`}
+              {income - serviceIncome > 0 && ` · ${formatNaira(income - serviceIncome)} not from a service sale`}
             </span>
             <button
               type="button"
@@ -687,11 +720,16 @@ function EntryForm({
   const [service, setService] = useState(initial?.service ?? "");
   const [serviceItem, setServiceItem] = useState(initial?.serviceItem ?? "");
   const [projectId, setProjectId] = useState(initial?.projectId ?? "");
-  const [bank, setBank] = useState(initial?.bank ?? "");
+  const [bank, setBank] = useState(
+    initial?.bank ?? (initial?.type === "Expense" ? "" : INCOME_BANKS[0]?.name ?? ""),
+  );
   const [error, setError] = useState<string | null>(null);
 
   const subItems = service ? itemsForService(service) : [];
   const isIncome = type === "Income";
+  // Money only arrives in accounts the company holds; it can leave for anywhere.
+  const bankChoices = isIncome ? INCOME_BANKS : BANKS_SORTED;
+  const isCapital = NON_SERVICE_INCOME.includes(service);
 
   const submit = () => {
     if (!description.trim()) {
@@ -708,7 +746,7 @@ function EntryForm({
       return;
     }
     if (isIncome && !service) {
-      setError("Choose which service this payment is for.");
+      setError("Choose which service this payment is for, or the reason if it is not a service sale.");
       return;
     }
     if (!bank) {
@@ -754,6 +792,9 @@ function EntryForm({
             setType(next);
             // Fee categories make no sense on income, and vice versa.
             setCategory(next === "Income" ? "Client income" : "Infrastructure");
+            // Income can only land in an account we hold, so a bank chosen for
+            // an expense may not be a valid destination the other way round.
+            setBank(next === "Income" ? INCOME_BANKS[0]?.name ?? "" : bank);
           }}
         >
           <option value="Income">Income</option>
@@ -766,18 +807,31 @@ function EntryForm({
       <Field label="Date">
         <TextInput type="date" value={date} onChange={(event) => setDate(event.target.value)} />
       </Field>
-      <Field label="Category">
-        <TextInput value={category} onChange={(event) => setCategory(event.target.value)} />
+      <Field label="Category" hint="Pick one or type your own.">
+        <TextInput
+          value={category}
+          list="finance-category-options"
+          onChange={(event) => setCategory(event.target.value)}
+        />
+        <datalist id="finance-category-options">
+          {(isIncome ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((option) => (
+            <option key={option} value={option} />
+          ))}
+        </datalist>
       </Field>
 
       <div className="lg:col-span-2">
         <Field
           label={isIncome ? "Bank paid into" : "Bank paying from"}
-          hint={isIncome ? "The account this money landed in." : "The account this money leaves."}
+          hint={
+            isIncome
+              ? "The account this money landed in. Only accounts the company holds."
+              : "The account this money leaves."
+          }
         >
           <Select value={bank} onChange={(event) => setBank(event.target.value)}>
-            <option value="">Choose a bank…</option>
-            {BANKS_SORTED.map((option) => (
+            {isIncome && bankChoices.length === 1 ? null : <option value="">Choose a bank…</option>}
+            {bankChoices.map((option) => (
               <option key={option.name} value={option.name}>
                 {option.label}
               </option>
@@ -789,28 +843,53 @@ function EntryForm({
       {isIncome ? (
         <>
           <div className="lg:col-span-3">
-            <Field label="Service paid for" hint="Every income entry is tied to the service the client is paying for.">
+            <Field
+              label="Service paid for"
+              hint={
+                isCapital
+                  ? "Not a service sale — capital the company put in itself."
+                  : "Which service the client is paying for, or another reason."
+              }
+            >
               <Select
                 value={service}
                 onChange={(event) => {
-                  setService(event.target.value);
+                  const next = event.target.value;
+                  setService(next);
                   setServiceItem("");
+                  // Capital is not client revenue; the category should follow.
+                  if (isCapitalReason(next)) setCategory("Founder capital");
+                  else if (isIncome && category === "Founder capital") setCategory("Client income");
                 }}
               >
                 <option value="">Choose a service…</option>
-                {SERVICE_OPTIONS.map((option) => (
-                  <option key={option.title} value={option.title}>
-                    {option.title}
-                  </option>
-                ))}
-                <option value="Other income">Other income (no service)</option>
+                <optgroup label="Services sold">
+                  {SERVICE_OPTIONS.map((option) => (
+                    <option key={option.title} value={option.title}>
+                      {option.title}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Not a service sale">
+                  {NON_SERVICE_INCOME.map((reason) => (
+                    <option key={reason} value={reason}>
+                      {reason}
+                    </option>
+                  ))}
+                </optgroup>
               </Select>
             </Field>
           </div>
           <div className="lg:col-span-3">
             <Field
               label="Sub-service"
-              hint={subItems.length ? undefined : "Pick a service above to narrow this down."}
+              hint={
+                isCapital
+                  ? "Not applicable — this is capital, not a service sale."
+                  : subItems.length
+                    ? undefined
+                    : "Pick a service above to narrow this down."
+              }
             >
               <Select
                 value={serviceItem}

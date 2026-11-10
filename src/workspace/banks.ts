@@ -2,13 +2,17 @@
  * Bank accounts money moves through.
  *
  * The workspace tracks *which bank an entry touches*: income records where the
- * payment landed, expenses record where the money left from. That is enough to
- * answer "what is actually sitting in GTBank right now?" without pretending to
- * be a reconciliation tool.
+ * payment landed, expenses record where the money left from.
  *
- * Edit this list to match the accounts the company really holds — the names
- * here are the banks, not specific account numbers, so two accounts at the same
- * bank would need distinguishing labels.
+ * The two lists differ on purpose. Money can only arrive in an account the
+ * company actually holds — today that is Fidelity, so income offers nothing
+ * else. Money can leave for anywhere: a contractor at GTBank, a vendor paid
+ * into Access, a SaaS tool on a card. Restricting expenses to Fidelity would
+ * have made half of them impossible to record.
+ *
+ * Edit `INCOME_BANKS` when another account is opened. The names here are the
+ * banks, not account numbers, so two accounts at the same bank would need
+ * distinguishing labels.
  */
 
 export interface BankOption {
@@ -44,7 +48,15 @@ export const BANK_OPTIONS: BankOption[] = [
   { name: "Other", label: "Other", color: "#6f6f6f" },
 ];
 
-export const BANK_NAMES: string[] = BANK_OPTIONS.map((bank) => bank.name);
+/**
+ * Where income can land. Only accounts the company holds.
+ * Fidelity is the only operating account for now.
+ */
+export const INCOME_BANK_NAMES: string[] = ["Fidelity Bank"];
+
+export const INCOME_BANKS: BankOption[] = BANK_OPTIONS.filter((bank) =>
+  INCOME_BANK_NAMES.includes(bank.name),
+);
 
 /** Same banks, alphabetical — pickers are much easier to scan this way. */
 export const BANKS_SORTED: BankOption[] = [...BANK_OPTIONS].sort((a, b) =>
