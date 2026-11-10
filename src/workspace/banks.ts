@@ -10,8 +10,8 @@
  * into Access, a SaaS tool on a card. Restricting expenses to Fidelity would
  * have made half of them impossible to record.
  *
- * Edit `INCOME_BANKS` when another account is opened. The names here are the
- * banks, not account numbers, so two accounts at the same bank would need
+ * Edit `INCOME_BANK_NAMES` when another account is opened. The names here are
+ * the banks, not account numbers, so two accounts at the same bank would need
  * distinguishing labels.
  */
 
@@ -50,9 +50,13 @@ export const BANK_OPTIONS: BankOption[] = [
 
 /**
  * Where income can land. Only accounts the company holds.
- * Fidelity is the only operating account for now.
+ *
+ * Fidelity is the operating bank account. OPay is here because real customer
+ * and founder money has come in through the OPay wallet (see Oct–Nov 2026), and
+ * a wallet is an account in every sense that matters — it holds the money until
+ * it is moved. Add to this list the day another account is opened.
  */
-export const INCOME_BANK_NAMES: string[] = ["Fidelity Bank"];
+export const INCOME_BANK_NAMES: string[] = ["Fidelity Bank", "OPay"];
 
 export const INCOME_BANKS: BankOption[] = BANK_OPTIONS.filter((bank) =>
   INCOME_BANK_NAMES.includes(bank.name),

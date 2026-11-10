@@ -14,7 +14,9 @@ import {
   importState,
   loadState,
   saveState,
+  STORAGE_KEY,
   todayISO,
+  WORKSPACE_STATE_VERSION,
   uid,
   type Bookmark,
   type Card,
@@ -487,10 +489,10 @@ export function useWorkspaceStore(): WorkspaceStore {
   // Keep two tabs of the workspace in step.
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
-      if (event.key !== "jojuni.workspace.v2" || !event.newValue) return;
+      if (event.key !== STORAGE_KEY || !event.newValue) return;
       try {
         const next = JSON.parse(event.newValue) as WorkspaceState;
-        if (next?.version === 2) setState(next);
+        if (next?.version === WORKSPACE_STATE_VERSION) setState(next);
       } catch {
         /* ignore malformed writes */
       }

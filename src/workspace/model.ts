@@ -217,10 +217,37 @@ export interface LedgerEntry {
    * Optional so existing entries keep loading.
    */
   bank?: string;
+  /**
+   * How the money moved, when it was not a plain transfer into `bank` — an
+   * OPay transfer, a card, a cheque. Important for a statement trail: an OPay
+   * payment never appears on the bank statement at all.
+   */
+  method?: string;
+  /**
+   * The other side of the transaction: the person or company who paid, or who
+   * was paid. Free text, because counterparties are invoices and individuals
+   * rather than a fixed list.
+   */
+  counterparty?: string;
 }
 
+/**
+ * Bumped when the stored shape changes in a way older data cannot survive.
+ *
+ * v2 → v3: the ledger stopped being sample data. A browser that had opened the
+ * workspace before 10 Nov 2026 was holding nine invented transactions, which
+ * would have sat alongside the real ones and quietly corrupted the books. The
+ * bump discards those workspaces so the real ledger seeds cleanly. Everything
+ * else in the workspace is sample content anyway, so nothing of value is lost.
+ */
+export const WORKSPACE_STATE_VERSION = 3;
+
+/** Keys from previous state versions, cleared on load so nothing lingers. */
+const LEGACY_STORAGE_KEYS = ["jojuni.workspace.v2"];
+
+
 export interface WorkspaceState {
-  version: 2;
+  version: typeof WORKSPACE_STATE_VERSION;
   people: Person[];
   /** The signed-in owner. Everything is edited as this person. */
   currentUserId: ID;
@@ -245,7 +272,7 @@ export interface WorkspaceState {
 /* Small helpers                                                       */
 /* ------------------------------------------------------------------ */
 
-export const STORAGE_KEY = "jojuni.workspace.v2";
+export const STORAGE_KEY = "jojuni.workspace.v3";
 
 export function uid(prefix = "id"): ID {
   const random =
@@ -523,10 +550,16 @@ export function upcomingEvents(state: WorkspaceState, limit = 8): EventItem[] {
 
 export function loadState(): WorkspaceState | null {
   try {
+    // Anything from an older schema is dropped rather than migrated: the seed
+    // is the source of truth, and a half-migrated ledger is worse than a reset.
+    for (const key of LEGACY_STORAGE_KEYS) localStorage.removeItem(key);
+
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as WorkspaceState;
-    if (!parsed || parsed.version !== 2 || !Array.isArray(parsed.projects)) return null;
+    if (!parsed || parsed.version !== WORKSPACE_STATE_VERSION || !Array.isArray(parsed.projects)) {
+      return null;
+    }
     return parsed;
   } catch {
     return null;
@@ -555,7 +588,7 @@ export function exportState(state: WorkspaceState): string {
 
 export function importState(json: string): WorkspaceState {
   const parsed = JSON.parse(json) as WorkspaceState;
-  if (!parsed || parsed.version !== 2 || !Array.isArray(parsed.projects)) {
+  if (!parsed || parsed.version !== WORKSPACE_STATE_VERSION || !Array.isArray(parsed.projects)) {
     throw new Error("That file is not a Jojuni workspace backup.");
   }
   return parsed;
@@ -1060,20 +1093,112 @@ export function createInitialState(): WorkspaceState {
   ];
 
   const ledger: LedgerEntry[] = [
-    { id: "led-1", date: dateDaysFromNow(-2), description: "Meridian milestone payment", category: "Client income", type: "Income", amount: 2850000, service: "Web Development", serviceItem: "Online Stores", projectId: "project-meridian", bank: "Fidelity Bank" },
-    { id: "led-2", date: dateDaysFromNow(-3), description: "Cloud infrastructure", category: "Infrastructure", type: "Expense", amount: 186500, bank: "Access Bank" },
-    { id: "led-3", date: dateDaysFromNow(-6), description: "Northstar discovery deposit", category: "Client income", type: "Income", amount: 1200000, service: "Software & App Development", serviceItem: "Mobile Apps", projectId: "project-northstar", bank: "Fidelity Bank" },
-    { id: "led-4", date: dateDaysFromNow(-8), description: "Design software licences", category: "Software", type: "Expense", amount: 97000, bank: "GTBank" },
-    { id: "led-5", date: dateDaysFromNow(-11), description: "Contract QA support", category: "Contractors", type: "Expense", amount: 325000, bank: "GTBank" },
-    { id: "led-6", date: dateDaysFromNow(-14), description: "Website care retainers", category: "Recurring income", type: "Income", amount: 680000, service: "Web Development", serviceItem: "Website Care", bank: "Fidelity Bank" },
-    // The account was opened with ₦1,200,000 the founders put in. It is capital,
-    // not revenue: it belongs in the ledger so the balance is right, but it must
-    // never be counted as client income.
-    { id: "led-7", date: dateDaysFromNow(-40), description: "Take-off grant from founders at account opening", category: "Founder capital", type: "Income", amount: 1200000, service: "Founder / take-off grant", bank: "Fidelity Bank" },
+    /* Real transactions. These are the company's actual first months of
+       trading, so this array is the books — not sample data. Demo rows must
+       never creep back in: on 10 Nov 2026 nine invented entries were replaced
+       by these and the stored ledger was wiped to match (see
+       `WORKSPACE_STATE_VERSION`).
+
+       Dates are fixed rather than relative so the ledger keeps matching the
+       bank and mobile-money statements it was copied from. */
+    {
+      id: "led-2026-10-02-a",
+      date: "2026-10-02",
+      description: "Take-off grant from Chieke Nwanna-Nzewunwa",
+      category: "Founder capital",
+      type: "Income",
+      amount: 500000,
+      service: "Founder / take-off grant",
+      bank: "OPay",
+      method: "OPay",
+      counterparty: "Chieke Nwanna-Nzewunwa",
+    },
+    {
+      id: "led-2026-10-02-b",
+      date: "2026-10-02",
+      description: "Take-off grant from Chieke Nwanna-Nzewunwa",
+      category: "Founder capital",
+      type: "Income",
+      amount: 200000,
+      service: "Founder / take-off grant",
+      bank: "OPay",
+      method: "OPay",
+      counterparty: "Chieke Nwanna-Nzewunwa",
+    },
+    {
+      id: "led-2026-10-03",
+      date: "2026-10-03",
+      description: "Take-off grant from Chieke Nwanna-Nzewunwa",
+      category: "Founder capital",
+      type: "Income",
+      amount: 500000,
+      service: "Founder / take-off grant",
+      bank: "OPay",
+      method: "OPay",
+      counterparty: "Chieke Nwanna-Nzewunwa",
+    },
+    {
+      id: "led-2026-10-07",
+      date: "2026-10-07",
+      description: "Test transfer to confirm account alerts work",
+      category: "Other income",
+      type: "Income",
+      amount: 100,
+      service: "Other income",
+      bank: "Fidelity Bank",
+      counterparty: "Edith",
+    },
+    {
+      id: "led-2026-10-08",
+      date: "2026-10-08",
+      description: "Take-off grant from Western Dada Limited",
+      category: "Founder capital",
+      type: "Income",
+      amount: 1000000,
+      service: "Founder / take-off grant",
+      bank: "Fidelity Bank",
+      method: "Bank transfer from First Bank",
+      counterparty: "Western Dada Limited",
+    },
+    {
+      id: "led-2026-10-16",
+      date: "2026-10-16",
+      description: "Search fee bank levy",
+      category: "Bank charges",
+      type: "Expense",
+      amount: 10000,
+      bank: "Fidelity Bank",
+    },
+    {
+      id: "led-2026-10-31",
+      date: "2026-10-31",
+      description: "Website design payment from Aviel Karis Limited",
+      category: "Client income",
+      type: "Income",
+      amount: 200000,
+      service: "Web Development",
+      serviceItem: "Business Websites",
+      bank: "Fidelity Bank",
+      method: "Bank transfer from Guaranty Trust Bank",
+      counterparty: "Aviel Karis Limited",
+    },
+    {
+      id: "led-2026-11-09",
+      date: "2026-11-09",
+      description: "Website design payment for PG Life Sciences",
+      category: "Client income",
+      type: "Income",
+      amount: 300000,
+      service: "Web Development",
+      serviceItem: "Business Websites",
+      bank: "OPay",
+      method: "OPay",
+      counterparty: "Chieke Nwanna-Nzewunwa",
+    },
   ];
 
   return {
-    version: 2,
+    version: WORKSPACE_STATE_VERSION,
     currentUserId: OWNER,
     people: [
       { id: OWNER, name: "Workspace Owner", initials: "WO", title: "Founder / Super admin", email: "hello@jojunitechnologies.com.ng", color: "#d90429", owner: true },

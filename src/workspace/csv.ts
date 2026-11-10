@@ -61,7 +61,20 @@ export function exportLedger(
   const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
 
   const rows: (string | number | undefined)[][] = [
-    ["Date", "Description", "Type", "Category", "Amount (NGN)", "Service", "Sub-service", "Project", "Bank", "Direction"],
+    [
+      "Date",
+      "Description",
+      "Type",
+      "Category",
+      "Amount (NGN)",
+      "Service",
+      "Sub-service",
+      "Project",
+      "Paid by / to",
+      "How it moved",
+      "Bank",
+      "Direction",
+    ],
   ];
 
   for (const entry of sorted) {
@@ -74,6 +87,8 @@ export function exportLedger(
       entry.service ?? "",
       entry.serviceItem ?? "",
       entry.projectId ? projectName.get(entry.projectId) ?? entry.projectId : "",
+      entry.counterparty ?? "",
+      entry.method ?? "",
       entry.bank ?? "",
       entry.type === "Income" ? "Money in" : "Money out",
     ]);
