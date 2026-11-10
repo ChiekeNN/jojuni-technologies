@@ -38,6 +38,16 @@ import {
   type TodoList,
   type WorkspaceState,
 } from "./model";
+import {
+  canDeleteMessage,
+  canEditMessage,
+  canSeeThread,
+  directKey,
+  readKey,
+  type ChatAttachment,
+  type ChatMessageEntry,
+  type ChatThread,
+} from "./chat";
 
 /** What a finance form produces: everything on an entry except its id. */
 export type LedgerDraft = Omit<LedgerEntry, "id">;
@@ -81,8 +91,27 @@ interface Actions {
   deletePost: (id: ID) => void;
   addReply: (postId: ID, body: string) => void;
 
-  /* campfire */
+  /* campfire (project chat — separate from the internal messenger) */
   sendChat: (projectId: ID, body: string) => void;
+
+  /* internal chat */
+  openDirect: (personId: ID) => ID;
+  createGroup: (input: { title: string; memberIds: ID[] }) => ID;
+  updateGroup: (threadId: ID, patch: { title?: string; memberIds?: ID[]; muted?: boolean }) => void;
+  leaveGroup: (threadId: ID) => void;
+  sendMessage: (input: {
+    threadId: ID;
+    body: string;
+    attachments?: ChatAttachment[];
+    replyTo?: { messageId: ID; authorId: ID; snippet: string };
+    forwardedFrom?: { chatTitle: string; authorName: string };
+  }) => ID;
+  editMessage: (messageId: ID, body: string) => void;
+  /** Soft delete — the row stays, showing "deleted", so replies still make sense. */
+  deleteMessage: (messageId: ID) => void;
+  toggleReaction: (messageId: ID, emoji: string) => void;
+  markRead: (threadId: ID) => void;
+  togglePin: (threadId: ID) => void;
 
   /* schedule */
   addEvent: (input: Omit<EventItem, "id" | "createdAt">) => void;
@@ -324,6 +353,202 @@ export function useWorkspaceStore(): WorkspaceStore {
         const message: ChatMessage = { id: uid("chat"), projectId, authorId: me(), body, createdAt: now() };
         commit((s) => ({ ...s, chats: [...s.chats, message] }));
       },
+
+      /* ---------------- internal chat ---------------- */
+      openDirect: (personId) => {
+        const existing = stateRef.current.chat.threads.find(
+          (thread) =>
+            thread.kind === "direct" &&
+            directKey(thread.memberIds[0] ?? "", thread.memberIds[1] ?? "") === directKey(me(), personId),
+        );
+        if (existing) return existing.id;
+        const thread: ChatThread = {
+          id: uid("thread"),
+          kind: "direct",
+          title: "",
+          memberIds: [me(), personId],
+          createdBy: me(),
+          createdAt: now(),
+        };
+        commit((s) => ({ ...s, chat: { ...s.chat, threads: [...s.chat.threads, thread] } }));
+        return thread.id;
+      },
+
+      createGroup: ({ title, memberIds }) => {
+        const thread: ChatThread = {
+          id: uid("thread"),
+          kind: "group",
+          title,
+          // The creator is always a member; a group you cannot see is a bug.
+          memberIds: Array.from(new Set([me(), ...memberIds])),
+          createdBy: me(),
+          createdAt: now(),
+          color: "#111111",
+        };
+        const systemMessage: ChatMessageEntry = {
+          id: uid("msg"),
+          chatId: thread.id,
+          authorId: me(),
+          kind: "system",
+          body: `${stateRef.current.people.find((p) => p.id === me())?.name ?? "Someone"} created “${title}”.`,
+          attachments: [],
+          reactions: [],
+          createdAt: now(),
+        };
+        commit((s) => ({
+          ...s,
+          chat: {
+            ...s.chat,
+            threads: [...s.chat.threads, thread],
+            messages: [...s.chat.messages, systemMessage],
+          },
+        }));
+        return thread.id;
+      },
+
+      updateGroup: (threadId, patch) =>
+        commit((s) => ({
+          ...s,
+          chat: {
+            ...s.chat,
+            threads: s.chat.threads.map((thread) =>
+              thread.id === threadId
+                ? {
+                    ...thread,
+                    ...patch,
+                    // Never let an edit remove the person doing the editing.
+                    memberIds: patch.memberIds
+                      ? Array.from(new Set([thread.createdBy, ...patch.memberIds]))
+                      : thread.memberIds,
+                  }
+                : thread,
+            ),
+          },
+        })),
+
+      leaveGroup: (threadId) =>
+        commit((s) => ({
+          ...s,
+          chat: {
+            ...s.chat,
+            threads: s.chat.threads.map((thread) =>
+              thread.id === threadId
+                ? { ...thread, memberIds: thread.memberIds.filter((id) => id !== me()) }
+                : thread,
+            ),
+          },
+        })),
+
+      sendMessage: ({ threadId, body, attachments, replyTo, forwardedFrom }) => {
+        const list = attachments ?? [];
+        const kind = list.some((item) => item.mime.startsWith("image/"))
+          ? "image"
+          : list.some((item) => item.mime.startsWith("audio/"))
+            ? "voice"
+            : list.length
+              ? "file"
+              : "text";
+        const message: ChatMessageEntry = {
+          id: uid("msg"),
+          chatId: threadId,
+          authorId: me(),
+          kind,
+          body,
+          attachments: list,
+          reactions: [],
+          replyTo,
+          forwardedFrom,
+          createdAt: now(),
+        };
+        commit((s) => ({
+          ...s,
+          chat: {
+            ...s.chat,
+            messages: [...s.chat.messages, message],
+            // Sending is reading: a thread you just spoke in has no unread.
+            reads: { ...s.chat.reads, [readKey(me(), threadId)]: message.createdAt },
+          },
+        }));
+        return message.id;
+      },
+
+      editMessage: (messageId, body) =>
+        commit((s) => ({
+          ...s,
+          chat: {
+            ...s.chat,
+            messages: s.chat.messages.map((message) =>
+              message.id === messageId && canEditMessage(message, me())
+                ? { ...message, body, editedAt: now() }
+                : message,
+            ),
+          },
+        })),
+
+      deleteMessage: (messageId) => {
+        const person = stateRef.current.people.find((p) => p.id === me());
+        const target = stateRef.current.chat.messages.find((message) => message.id === messageId);
+        // Checked here as well as in the UI: the rule has to hold wherever the
+        // action is called from, not just where a button happens to be hidden.
+        if (!target || !canDeleteMessage(target, person, me())) return;
+        commit((s) => ({
+          ...s,
+          chat: {
+            ...s.chat,
+            messages: s.chat.messages.map((message) =>
+              message.id === messageId
+                ? { ...message, deletedAt: now(), deletedBy: me(), body: "", attachments: [], reactions: [] }
+                : message,
+            ),
+          },
+        }));
+      },
+
+      toggleReaction: (messageId, emoji) =>
+        commit((s) => ({
+          ...s,
+          chat: {
+            ...s.chat,
+            messages: s.chat.messages.map((message) => {
+              if (message.id !== messageId || message.deletedAt) return message;
+              const existing = message.reactions.find((reaction) => reaction.emoji === emoji);
+              if (!existing) {
+                return { ...message, reactions: [...message.reactions, { emoji, personIds: [me()] }] };
+              }
+              const mine = existing.personIds.includes(me());
+              const personIds = mine
+                ? existing.personIds.filter((id) => id !== me())
+                : [...existing.personIds, me()];
+              return {
+                ...message,
+                reactions: message.reactions
+                  .map((reaction) => (reaction.emoji === emoji ? { ...reaction, personIds } : reaction))
+                  // A reaction nobody holds any more is not a reaction.
+                  .filter((reaction) => reaction.personIds.length > 0),
+              };
+            }),
+          },
+        })),
+
+      markRead: (threadId) =>
+        commit((s) => {
+          const thread = s.chat.threads.find((item) => item.id === threadId);
+          // Reading a thread you are not a member of must not mark anything.
+          if (!thread || !canSeeThread(thread, me())) return s;
+          return {
+            ...s,
+            chat: { ...s.chat, reads: { ...s.chat.reads, [readKey(me(), threadId)]: now() } },
+          };
+        }),
+
+      togglePin: (threadId) =>
+        commit((s) => {
+          const mine = s.chat.pins[me()] ?? [];
+          const next = mine.includes(threadId)
+            ? mine.filter((id) => id !== threadId)
+            : [...mine, threadId];
+          return { ...s, chat: { ...s.chat, pins: { ...s.chat.pins, [me()]: next } } };
+        }),
 
       /* ---------------- schedule ---------------- */
       addEvent: (input) =>
