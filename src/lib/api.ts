@@ -103,14 +103,6 @@ export const api = {
 
   workspace: (role: Role | null) => request<WorkspaceResponse>("/api/workspace", { role }),
 
-  createLead: (lead: { name: string; email: string; company?: string; brief: string; website?: string }) =>
-    request<{
-      id: string | null;
-      accepted: boolean;
-      /** Present on newer deployments; absent means it predates email support. */
-      email?: { notified: boolean; acknowledged: boolean };
-    }>("/api/leads", { method: "POST", body: lead }),
-
   tasks: {
     create: (task: Partial<Task>, role: Role | null) =>
       request<{ task: Task }>("/api/workspace/tasks", { method: "POST", body: task, role }),
