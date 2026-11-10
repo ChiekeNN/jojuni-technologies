@@ -23,16 +23,55 @@ export type EventKind = "Milestone" | "Deadline" | "Meeting" | "Event";
 export type DocKind = "doc" | "file" | "link";
 export type TransactionType = "Income" | "Expense";
 
+/**
+ * What a person is to the company.
+ *
+ * Staff are on payroll and can be assigned work. Clients and vendors are
+ * contacts: they are tracked so the business can reach and pay them, but they
+ * are not project members and never get a to-do assigned. That distinction is
+ * enforced where it matters rather than left to whoever is filling the form.
+ */
+export type PersonCategory = "staff" | "client" | "vendor";
+
 export interface Person {
   id: ID;
+  /**
+   * The display name. Kept as one field because it is what every avatar, chip
+   * and assignment menu already reads; `firstName` / `lastName` below are the
+   * structured version, and `name` is derived from them when saving.
+   */
   name: string;
   initials: string;
+  /** Job title for staff, role for a client contact, service for a vendor. */
   title: string;
   email: string;
   /** Solid colour used for the avatar chip. */
   color: string;
   /** Owner is always a member of every project and cannot be removed. */
   owner?: boolean;
+
+  /**
+   * Staff by default: a person added before this field existed was a colleague.
+   * Optional so workspaces saved earlier keep loading.
+   */
+  category?: PersonCategory;
+  firstName?: string;
+  lastName?: string;
+  /** Primary phone, as entered. Formatting is left to the person typing. */
+  phone?: string;
+  /** Separate from `phone`: the number WhatsApp actually reaches them on. */
+  whatsapp?: string;
+  /** Postal or street address, free text and multi-line. */
+  address?: string;
+  /**
+   * Clients: the company they represent. Vendors: their business, if they have
+   * one. Freelance vendors legitimately have none, which is why this is not
+   * required for them.
+   */
+  company?: string;
+  /** True when a vendor works for themselves rather than through a company. */
+  freelance?: boolean;
+  createdAt?: string;
 }
 
 export interface Project {
@@ -377,6 +416,73 @@ export function isThisWeek(iso: string): boolean {
 
 export function personById(state: WorkspaceState, id: ID | ""): Person | undefined {
   return state.people.find((person) => person.id === id);
+}
+
+/**
+ * People who can be assigned work: staff only.
+ *
+ * Clients and vendors are contacts. Putting a client in a to-do assignee menu
+ * is the kind of small mistake that makes a workspace feel unreliable, so the
+ * rule lives here and every assignee list reads it.
+ */
+export function assignablePeople(people: Person[]): Person[] {
+  return people.filter((person) => (person.category ?? "staff") === "staff");
+}
+
+/** Everyone in a category, in the order they were added. */
+export function peopleByCategory(people: Person[], category: PersonCategory): Person[] {
+  return people.filter((person) => (person.category ?? "staff") === category);
+}
+
+/** Counts per category, for the tabs on the People page. */
+export function peopleCounts(people: Person[]): Record<PersonCategory, number> {
+  return {
+    staff: peopleByCategory(people, "staff").length,
+    client: peopleByCategory(people, "client").length,
+    vendor: peopleByCategory(people, "vendor").length,
+  };
+}
+
+/** "Ada Madu" -> { first: "Ada", last: "Madu" } */
+export function splitName(name: string): { first: string; last: string } {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return { first: "", last: "" };
+  if (parts.length === 1) return { first: parts[0], last: "" };
+  return { first: parts[0], last: parts.slice(1).join(" ") };
+}
+
+/**
+ * What to show under a person's name on a card.
+ *
+ * A client is known by their company first — that is how an invoice is made
+ * out and how anyone looks them up. A freelance vendor has no company, so the
+ * service they provide is the useful line instead.
+ */
+export function personSubtitle(person: Person): string {
+  if (person.category === "client") return person.company || person.title || "Client";
+  if (person.category === "vendor") {
+    if (person.freelance) {
+      if (!person.title) return "Freelance";
+      return /freelance/i.test(person.title) ? person.title : `Freelance · ${person.title}`;
+    }
+    return person.company || person.title || "Vendor";
+  }
+  return person.title;
+}
+
+/** International dialling link, so the number works from any device. */
+export function telHref(value: string): string {
+  const digits = value.replace(/[^\d+]/g, "");
+  return `tel:${digits}`;
+}
+
+/** wa.me link. Nigeria defaults to 234 when the number is entered locally. */
+export function whatsappHref(value: string): string {
+  const digits = value.replace(/[^\d]/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("234")) return `https://wa.me/${digits}`;
+  if (digits.startsWith("0")) return `https://wa.me/234${digits.slice(1)}`;
+  return `https://wa.me/${digits}`;
 }
 
 export function initialsOf(name: string): string {
@@ -1333,11 +1439,60 @@ export function createInitialState(): WorkspaceState {
     version: WORKSPACE_STATE_VERSION,
     currentUserId: OWNER,
     people: [
-      { id: OWNER, name: "Workspace Owner", initials: "WO", title: "Founder / Super admin", email: "hello@jojunitechnologies.com.ng", color: "#d90429", owner: true },
-      { id: ADA, name: "Ada Madu", initials: "AM", title: "Delivery lead", email: "ada@jojunitechnologies.com.ng", color: "#111111" },
-      { id: EMEKA, name: "Emeka Obi", initials: "EO", title: "Finance & operations", email: "emeka@jojunitechnologies.com.ng", color: "#6f6f6f" },
-      { id: KENE, name: "Kene Ibe", initials: "KI", title: "Product designer", email: "kene@jojunitechnologies.com.ng", color: "#0f766e" },
-      { id: BOLA, name: "Bola Nnaji", initials: "BN", title: "Engineer", email: "bola@jojunitechnologies.com.ng", color: "#7c3aed" },
+      { id: OWNER, name: "Workspace Owner", firstName: "Workspace", lastName: "Owner", category: "staff", initials: "WO", title: "Founder / Super admin", email: "hello@jojunitechnologies.com.ng", color: "#d90429", owner: true },
+      { id: ADA, name: "Ada Madu", firstName: "Ada", lastName: "Madu", category: "staff", initials: "AM", title: "Delivery lead", email: "ada@jojunitechnologies.com.ng", color: "#111111" },
+      { id: EMEKA, name: "Emeka Obi", firstName: "Emeka", lastName: "Obi", category: "staff", initials: "EO", title: "Finance & operations", email: "emeka@jojunitechnologies.com.ng", color: "#6f6f6f" },
+      { id: KENE, name: "Kene Ibe", firstName: "Kene", lastName: "Ibe", category: "staff", initials: "KI", title: "Product designer", email: "kene@jojunitechnologies.com.ng", color: "#0f766e" },
+      { id: BOLA, name: "Bola Nnaji", firstName: "Bola", lastName: "Nnaji", category: "staff", initials: "BN", title: "Engineer", email: "bola@jojunitechnologies.com.ng", color: "#7c3aed" },
+
+      /* Contacts, not colleagues. These are the two sides of the business:
+         the people who pay us and the people we pay. Kept out of project
+         membership so they never appear in an assignment menu. */
+      {
+        id: "client-aviel",
+        name: "Aviel Karis",
+        firstName: "Aviel",
+        lastName: "Karis",
+        category: "client",
+        initials: "AK",
+        title: "Director",
+        email: "accounts@avielkaris.com",
+        phone: "+234 803 000 0001",
+        whatsapp: "+234 803 000 0001",
+        address: "12B Woji Road, GRA Phase 2, Port Harcourt, Rivers State",
+        company: "Aviel Karis Limited",
+        color: "#1d4ed8",
+      },
+      {
+        id: "client-western",
+        name: "Western Dada",
+        firstName: "Western",
+        lastName: "Dada",
+        category: "client",
+        initials: "WD",
+        title: "Managing Director",
+        email: "info@westerndada.com",
+        phone: "+234 802 000 0002",
+        whatsapp: "+234 802 000 0002",
+        address: "Plot 5, Trans-Amadi Industrial Layout, Port Harcourt",
+        company: "Western Dada Limited",
+        color: "#0e7490",
+      },
+      {
+        id: "vendor-fresh",
+        name: "Chidi Okonkwo",
+        firstName: "Chidi",
+        lastName: "Okonkwo",
+        category: "vendor",
+        initials: "CO",
+        title: "Freelance designer",
+        email: "chidi.okonkwo@gmail.com",
+        phone: "+234 701 000 0003",
+        whatsapp: "+234 701 000 0003",
+        address: "Rumuokoro, Port Harcourt",
+        freelance: true,
+        color: "#b45309",
+      },
     ],
     projects,
     todoLists,

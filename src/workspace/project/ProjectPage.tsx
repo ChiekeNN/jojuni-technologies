@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 
 import { useWorkspace } from "../store";
-import {
+import { assignablePeople,
   dueLabel,
   hillForProject,
   isOverdue,
@@ -90,7 +90,7 @@ export function ProjectPage({
     );
   }
 
-  const members = state.people.filter((person) => project.members.includes(person.id));
+  const members = assignablePeople(state.people).filter((person) => project.members.includes(person.id));
   const progress = projectProgress(state, project.id);
   const openTodos = state.todos.filter((todo) => todo.projectId === project.id && !todo.done);
 
@@ -223,7 +223,7 @@ function Overview({
   const events = upcomingEvents(state, 20).filter((event) => event.projectId === projectId).slice(0, 4);
   const todos = state.todos.filter((todo) => todo.projectId === projectId && !todo.done);
   const scopes = hillForProject(state, projectId);
-  const members = state.people.filter((person) => project.members.includes(person.id));
+  const members = assignablePeople(state.people).filter((person) => project.members.includes(person.id));
   const chats = state.chats.filter((chat) => chat.projectId === projectId).slice(-3);
 
   return (
