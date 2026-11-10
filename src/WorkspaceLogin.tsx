@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { ArrowLeft, Eye, EyeOff, Loader2, Lock } from "lucide-react";
 
 import { ApiError, api } from "./lib/api";
+import { companyInfo } from "./site/content";
 
 /**
  * Workspace sign-in.
@@ -206,8 +207,11 @@ export default function LoginPage({ onSignedIn, expired = false }: LoginPageProp
         </div>
       </main>
 
-      <footer className="px-5 pb-8 text-xs text-white/30 sm:px-10">
-        © {new Date().getFullYear()} Jojuni Technologies. Super-admin access.
+      <footer className="bg-white px-5 py-6 text-xs text-black/55 sm:px-10">
+        <div className="mx-auto flex max-w-[1180px] flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+          <p>© {new Date().getFullYear()} {companyInfo.legalName}. All rights reserved.</p>
+          <p className="text-black/45">Registered in Nigeria · CAC {companyInfo.registration}</p>
+        </div>
       </footer>
     </div>
   );
