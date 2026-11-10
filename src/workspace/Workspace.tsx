@@ -17,14 +17,27 @@ import { MyWorkView } from "./views/MyWorkView";
 import { PeopleView } from "./views/PeopleView";
 import { ReportsView } from "./views/ReportsView";
 import { SettingsView } from "./views/SettingsView";
+import { ChatView } from "./views/ChatView";
 
 interface Route {
   view: TopView;
   projectId: string | null;
   tab: ProjectTabId;
+  /** `#/workspace/chat/<threadId>` — the open conversation, so it can be linked. */
+  threadId?: string;
 }
 
-const TOP_VIEWS: TopView[] = ["home", "mywork", "everything", "lineup", "people", "reports", "finance", "settings"];
+const TOP_VIEWS: TopView[] = [
+  "home",
+  "mywork",
+  "everything",
+  "lineup",
+  "people",
+  "reports",
+  "finance",
+  "chat",
+  "settings",
+];
 
 /** `#/workspace/project/<id>/<tab>` — hash routing so links are shareable without a server. */
 function parseHash(): Route {
@@ -36,7 +49,7 @@ function parseHash(): Route {
     return { view: "home", projectId: parts[2], tab: tab ?? "overview" };
   }
   if (parts[0] === "workspace" && parts[1] && TOP_VIEWS.includes(parts[1] as TopView)) {
-    return { view: parts[1] as TopView, projectId: null, tab: "overview" };
+    return { view: parts[1] as TopView, projectId: null, tab: "overview", threadId: parts[2] };
   }
   return { view: "home", projectId: null, tab: "overview" };
 }
@@ -46,6 +59,7 @@ function buildHash(route: Route): string {
     const tabSlug = route.tab === "overview" ? "" : `/${slugForTab(route.tab)}`;
     return `#/workspace/project/${route.projectId}${tabSlug}`;
   }
+  if (route.view === "chat" && route.threadId) return `#/workspace/chat/${route.threadId}`;
   return `#/workspace/${route.view}`;
 }
 
@@ -113,6 +127,8 @@ export default function Workspace() {
           <PeopleView onOpenProject={openProject} />
         ) : route.view === "reports" || route.view === "finance" ? (
           <ReportsView onOpenProject={openProject} />
+        ) : route.view === "chat" ? (
+          <ChatView threadId={route.threadId} onOpenThread={(threadId) => navigateState({ ...route, threadId })} />
         ) : (
           <SettingsView onOpenProject={openProject} />
         )}

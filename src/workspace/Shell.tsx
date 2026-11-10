@@ -17,6 +17,7 @@ import {
   Menu,
   MessageSquare,
   Network,
+  MessageCircle,
   NotebookPen,
   Search,
   Settings,
@@ -25,6 +26,7 @@ import {
 } from "lucide-react";
 
 import { Avatar, Chip, cx } from "./ui";
+import { totalUnread } from "./chat";
 import {
   dueLabel,
   isOverdue,
@@ -42,6 +44,7 @@ export type TopView =
   | "people"
   | "reports"
   | "finance"
+  | "chat"
   | "settings";
 
 export interface NavCounts {
@@ -57,6 +60,7 @@ const topNav: { id: TopView; label: string; icon: typeof Home }[] = [
   { id: "reports", label: "Reports", icon: Network },
   { id: "people", label: "People", icon: Users },
   { id: "finance", label: "Finance", icon: ListTodo },
+  { id: "chat", label: "Chat", icon: MessageCircle },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
@@ -262,7 +266,7 @@ export function Shell({
               onClick={() => go(item.id)}
               icon={<item.icon className="h-4 w-4 shrink-0" />}
               label={item.label}
-              badge={item.id === "finance" ? undefined : undefined}
+              badge={item.id === "chat" ? totalUnread(state.chat, state.currentUserId) || undefined : undefined}
             />
           ))}
           <SidebarLink
@@ -504,7 +508,9 @@ function SidebarLink({
       {icon}
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {badge ? (
-        <span className="shrink-0 rounded bg-white/10 px-1 text-[10px] font-semibold text-white/60">{badge}</span>
+        <span className="shrink-0 rounded-full bg-[#d90429] px-1.5 text-[10px] font-bold leading-4 text-white">
+          {badge > 99 ? "99+" : badge}
+        </span>
       ) : null}
     </button>
   );

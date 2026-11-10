@@ -1,3 +1,6 @@
+import type { ChatMessageEntry, ChatState, ChatThread } from "./chat";
+import { EMPTY_CHAT_STATE } from "./chat";
+
 /**
  * Workspace domain model.
  *
@@ -266,6 +269,8 @@ export interface WorkspaceState {
   notes: Note[];
   bookmarks: Bookmark[];
   ledger: LedgerEntry[];
+  /** Internal chat: direct messages and private groups. */
+  chat: ChatState;
 }
 
 /* ------------------------------------------------------------------ */
@@ -560,6 +565,9 @@ export function loadState(): WorkspaceState | null {
     if (!parsed || parsed.version !== WORKSPACE_STATE_VERSION || !Array.isArray(parsed.projects)) {
       return null;
     }
+    // Chat was added after the first v3 saves were in the wild. A workspace
+    // from before it simply gains an empty one rather than being thrown away.
+    if (!parsed.chat) parsed.chat = EMPTY_CHAT_STATE;
     return parsed;
   } catch {
     return null;
@@ -1197,6 +1205,130 @@ export function createInitialState(): WorkspaceState {
     },
   ];
 
+  /* Internal chat. The staff group is the one everybody belongs to — the
+     answer to "staff need an internal chat". Two direct threads are seeded so
+     the feature is not an empty shell on first open. */
+  const staffThreadId = "thread-staff";
+  const chatThreads: ChatThread[] = [
+    {
+      id: staffThreadId,
+      kind: "group",
+      title: "Staff",
+      memberIds: [OWNER, ADA, EMEKA, KENE, BOLA],
+      createdBy: OWNER,
+      createdAt: isoDaysAgo(60),
+      color: "#d90429",
+    },
+    {
+      id: "thread-finance",
+      kind: "group",
+      title: "Finance & operations",
+      memberIds: [OWNER, EMEKA],
+      createdBy: OWNER,
+      createdAt: isoDaysAgo(30),
+      color: "#0f766e",
+    },
+    {
+      id: "thread-dm-ada",
+      kind: "direct",
+      title: "",
+      memberIds: [OWNER, ADA],
+      createdBy: OWNER,
+      createdAt: isoDaysAgo(20),
+    },
+    {
+      id: "thread-dm-emeka",
+      kind: "direct",
+      title: "",
+      memberIds: [OWNER, EMEKA],
+      createdBy: OWNER,
+      createdAt: isoDaysAgo(12),
+    },
+  ];
+
+  const chatMessages: ChatMessageEntry[] = [
+    {
+      id: "msg-1",
+      chatId: staffThreadId,
+      authorId: OWNER,
+      kind: "system",
+      body: "You created the Staff group. Everyone in the company is here.",
+      attachments: [],
+      reactions: [],
+      createdAt: isoDaysAgo(60),
+    },
+    {
+      id: "msg-2",
+      chatId: staffThreadId,
+      authorId: ADA,
+      kind: "text",
+      body: "Morning all. Standup notes are on the board if anyone missed it.",
+      attachments: [],
+      reactions: [{ emoji: "like", personIds: [OWNER, KENE] }],
+      createdAt: isoDaysAgo(2, 8),
+    },
+    {
+      id: "msg-3",
+      chatId: staffThreadId,
+      authorId: KENE,
+      kind: "text",
+      body: "Checkout copy is locked. I will put the last screens in the design folder this afternoon.",
+      attachments: [],
+      reactions: [{ emoji: "fire", personIds: [ADA] }],
+      replyTo: { messageId: "msg-2", authorId: ADA, snippet: "Morning all. Standup notes are on the board…" },
+      createdAt: isoDaysAgo(2, 9),
+    },
+    {
+      id: "msg-4",
+      chatId: staffThreadId,
+      authorId: BOLA,
+      kind: "text",
+      body: "Reminder: the client review is Thursday at 10. Bring anything that needs a decision.",
+      attachments: [],
+      reactions: [{ emoji: "celebrate", personIds: [OWNER, ADA, KENE] }],
+      createdAt: isoDaysAgo(1, 16),
+    },
+    {
+      id: "msg-5",
+      chatId: "thread-finance",
+      authorId: EMEKA,
+      kind: "text",
+      body: "The Fidelity levy cleared — ₦10,000, already in the ledger as a bank charge.",
+      attachments: [],
+      reactions: [{ emoji: "like", personIds: [OWNER] }],
+      createdAt: isoDaysAgo(9, 11),
+    },
+    {
+      id: "msg-6",
+      chatId: "thread-dm-ada",
+      authorId: ADA,
+      kind: "text",
+      body: "Do you want me to send the Meridian staging link to the client today, or wait until Friday?",
+      attachments: [],
+      reactions: [],
+      createdAt: isoDaysAgo(3, 14),
+    },
+    {
+      id: "msg-7",
+      chatId: "thread-dm-emeka",
+      authorId: EMEKA,
+      kind: "text",
+      body: "Petty cash for the courier came out of my own pocket — should I log it as a reimbursement?",
+      attachments: [],
+      reactions: [],
+      createdAt: isoDaysAgo(5, 10),
+    },
+  ];
+
+  const chat: ChatState = {
+    threads: chatThreads,
+    messages: chatMessages,
+    // Everyone is caught up on the seeded messages; unread should be 0 on a
+    // fresh workspace rather than a fake backlog.
+    reads: { [`${OWNER}:${staffThreadId}`]: isoDaysAgo(0) },
+    pins: {},
+  };
+
   return {
     version: WORKSPACE_STATE_VERSION,
     currentUserId: OWNER,
@@ -1212,6 +1344,7 @@ export function createInitialState(): WorkspaceState {
     todos,
     posts,
     chats,
+    chat,
     events,
     folders,
     docs,
