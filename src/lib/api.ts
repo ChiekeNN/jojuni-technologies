@@ -35,14 +35,21 @@ export class ApiError extends Error {
 
 interface RequestOptions extends Omit<RequestInit, "body"> {
   body?: unknown;
+  /** Retained for call-site compatibility; the server no longer trusts it. */
   role?: Role | null;
 }
 
+export interface WorkspaceAuthState {
+  authenticated: boolean;
+  role?: Role;
+  label?: string;
+  expiresAt?: string;
+}
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { body, role, headers, ...rest } = options;
+  const { body, headers, ...rest } = options;
   const headerRecord: Record<string, string> = {};
   if (body !== undefined) headerRecord["content-type"] = "application/json";
-  if (role) headerRecord["x-workspace-role"] = role;
   if (headers) {
     new Headers(headers).forEach((value, key) => {
       headerRecord[key] = value;
@@ -54,6 +61,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     response = await fetch(path, {
       ...rest,
       headers: headerRecord,
+      credentials: "same-origin",
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch (error) {
@@ -100,6 +108,14 @@ export interface HealthResponse {
 
 export const api = {
   health: () => request<HealthResponse>("/api/health"),
+
+  workspaceAuth: {
+    /** Whether this browser currently holds a valid session. */
+    check: () => request<WorkspaceAuthState>("/api/workspace/auth"),
+    login: (password: string) =>
+      request<WorkspaceAuthState>("/api/workspace/auth", { method: "POST", body: { password } }),
+    logout: () => request<WorkspaceAuthState>("/api/workspace/auth", { method: "DELETE" }),
+  },
 
   workspace: (role: Role | null) => request<WorkspaceResponse>("/api/workspace", { role }),
 

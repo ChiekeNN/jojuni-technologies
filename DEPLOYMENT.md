@@ -95,8 +95,9 @@ curl -X POST https://<your-app>.vercel.app/api/leads \
 curl https://<your-app>.vercel.app/api/leads?limit=10 \
   -H "x-admin-key: $ADMIN_API_KEY"
 
-# workspace snapshot as the founder role
-curl https://<your-app>.vercel.app/api/workspace -H 'x-workspace-role: founder'
+# workspace snapshot — super-admin only, so this 401s without a session
+curl https://<your-app>.vercel.app/api/workspace
+# {"error":"unauthorized",...}
 ```
 
 ---
@@ -110,16 +111,31 @@ curl https://<your-app>.vercel.app/api/workspace -H 'x-workspace-role: founder'
 | `/api/health` says `database_unreachable` | Wrong/expired connection string, or Neon project suspended (free tier auto-suspends; first request after idle wakes it — takes ~1s). |
 | API feels slow (>500 ms) | Region mismatch: Neon region vs `regions` in `vercel.json`. Put both in London, or move both. |
 | `/workspace` 404s on a Vercel deployment | Missing rewrite — check `vercel.json` is committed at the repo root. |
-| Contact form shows the red error line | The API returned an error; the message names it. Database causes show the hint above. |
+| `/workspace` shows the password screen and sign-in says *no database is configured* | `DATABASE_URL` missing, or `db/schema.sql` not applied. Run `npm run db:migrate`. |
+| `/workspace` rejects the password | The seeded hash and the password disagree. Reset it with `node scripts/workspace-password.mjs`. |
+| Signed out unexpectedly | Sessions expire after 7 days, and signing out on any device clears that session only. |
 | Old workspace UI after a deploy | Service worker: bump `CACHE_NAME` in `public/workspace-sw.js` (it is `no-cache`, so clients pick the new worker on next visit). |
 
 ## Security notes (honest ones)
 
-- `x-workspace-role` mirrors the in-app role switcher and is trivially spoofable.
-  It keeps honest users out of the ledger; it is **not** authentication. Add
-  Clerk/Auth.js/WorkOS before storing real company financials.
+- `/workspace` is **super-admin only**: password, no username. The password is
+  stored as a scrypt hash in `workspace_accounts` and verified server-side by
+  `POST /api/workspace/auth`. It is never in the browser bundle.
+- Sessions are opaque random tokens in an HttpOnly, SameSite=Strict cookie;
+  only their SHA-256 digest is stored. They expire after 7 days and are
+  revoked on sign-out.
+- Sign-in is rate limited to 8 attempts per IP per 15 minutes, counted in the
+  database so cold starts do not reset it.
+- The old `x-workspace-role` header is now **ignored**; role comes from the
+  session.
+- One shared password is still one factor. Before storing real financials,
+  consider putting an identity provider (Clerk, Auth.js, WorkOS) in front —
+  the session layer here is designed to be swapped out wholesale.
+- Rotate the password with `node scripts/workspace-password.mjs`; it prints an
+  `update` statement and a `delete from workspace_sessions` that signs every
+  device out.
 - `ADMIN_API_KEY` protects lead export. Rotate it like any secret.
-- The contact form has a honeypot field; consider Vercel's bot protection or a
-  rate limit if spam appears.
+- `POST /api/leads` still works but the public site no longer posts to it
+  (the contact page is details-only). Its honeypot is still in place.
 - File uploads store **metadata only** today (`storage_url` column is reserved
   for Vercel Blob / S3 when you're ready for real bytes).

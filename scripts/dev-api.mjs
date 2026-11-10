@@ -19,6 +19,7 @@ const ROUTES = new Map([
   ["/api/health", () => import("../api/health.ts")],
   ["/api/leads", () => import("../api/leads.ts")],
   ["/api/workspace", () => import("../api/workspace/index.ts")],
+  ["/api/workspace/auth", () => import("../api/workspace/auth.ts")],
   ["/api/workspace/tasks", () => import("../api/workspace/tasks.ts")],
   ["/api/workspace/projects", () => import("../api/workspace/projects.ts")],
   ["/api/workspace/ledger", () => import("../api/workspace/ledger.ts")],
@@ -47,7 +48,7 @@ const server = createServer(async (req, res) => {
     res.writeHead(204, {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
-      "Access-Control-Allow-Headers": "content-type,x-workspace-role,x-admin-key,authorization",
+      "Access-Control-Allow-Headers": "content-type,x-admin-key,authorization",
     });
     res.end();
     return;

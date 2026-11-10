@@ -17,6 +17,7 @@ export type ApiErrorCode =
   | "database_not_configured"
   | "schema_missing"
   | "database_unreachable"
+  | "unauthorized"
   | "forbidden"
   | "not_found"
   | "internal_error";

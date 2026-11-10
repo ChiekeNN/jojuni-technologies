@@ -1,4 +1,4 @@
-import { FINANCE_ROLES, type WorkspaceSnapshot } from "../../shared/types";
+import type { WorkspaceSnapshot } from "../../shared/types";
 import { query } from "../_lib/db";
 import { requireMethod, sendJson, withApiHandler, type ApiRequest, type ApiResponse } from "../_lib/http";
 import {
@@ -13,7 +13,7 @@ import {
   type ProjectRow,
   type TaskRow,
 } from "../_lib/mappers";
-import { workspaceRole } from "../_lib/roles";
+import { requireWorkspaceSession } from "../_lib/roles";
 
 /**
  * GET /api/workspace
@@ -23,8 +23,9 @@ import { workspaceRole } from "../_lib/roles";
  */
 export default withApiHandler(async (req: ApiRequest, res: ApiResponse) => {
   requireMethod(req, ["GET"]);
-  const role = workspaceRole(req);
-  const canViewFinance = role !== null && FINANCE_ROLES.includes(role);
+  // Super-admin only: the snapshot is the whole company workspace.
+  const session = await requireWorkspaceSession(req);
+  const canViewFinance = session.role === "founder" || session.role === "accountant";
 
   const [taskRows, projectRows, fileRows, messageRows] = await Promise.all([
     query<TaskRow>(

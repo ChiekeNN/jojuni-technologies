@@ -50,6 +50,8 @@ export const EXPECTED_TABLES = [
   "ledger_entries",
   "workspace_files",
   "workspace_messages",
+  "workspace_accounts",
+  "workspace_sessions",
   "leads",
 ] as const;
 

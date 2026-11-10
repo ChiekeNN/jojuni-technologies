@@ -10,12 +10,16 @@ import {
 } from "../_lib/http";
 import { mapProject, type ProjectRow } from "../_lib/mappers";
 import { asNumber, asOptionalString, asString } from "../_lib/validation";
+import { requireWorkspaceSession } from "../_lib/roles";
 
 const COLUMNS = "id, name, client, progress, due, color, members";
 const SELECT = `select ${COLUMNS} from public.projects`;
 
 /** GET | POST | PATCH | DELETE /api/workspace/projects */
 export default withApiHandler(async (req: ApiRequest, res: ApiResponse) => {
+  // Super-admin only: no valid session means no workspace data.
+  await requireWorkspaceSession(req);
+
   const method = (req.method ?? "").toUpperCase();
 
   if (method === "GET") {

@@ -112,6 +112,8 @@ export function handleHandlerError(res: ApiResponse, error: unknown): void {
           ? 400
           : error.code === "forbidden"
             ? 403
+            : error.code === "unauthorized"
+              ? 401
             : 503;
     sendError(res, status, error.code, error.message, error.hint);
     return;
