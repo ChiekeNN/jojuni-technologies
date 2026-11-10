@@ -85,7 +85,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </div>
             <div>
               <p className="mb-5 text-xs font-bold uppercase tracking-[0.2em] text-white/40">Contact</p>
-              <div className="space-y-4 text-sm text-white/70">
+              <div className="space-y-4 text-sm text-white">
                 <a href={`mailto:${contactInfo.email}`} className="flex items-center gap-3 hover:text-[#d90429]"><Mail className="h-4 w-4 shrink-0" /> {contactInfo.email}</a>
                 <a href={`tel:${telHref()}`} className="flex items-center gap-3 hover:text-[#d90429]"><Phone className="h-4 w-4 shrink-0" /> {contactInfo.phone}</a>
                 <p className="flex items-center gap-3"><MapPin className="h-4 w-4 shrink-0" /> {contactInfo.office}</p>
