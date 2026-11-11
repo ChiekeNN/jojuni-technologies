@@ -16,6 +16,7 @@ import { LineupView } from "./views/LineupView";
 import { NewProjectProvider } from "./NewProjectModal";
 import { MyWorkView } from "./views/MyWorkView";
 import { PeopleView } from "./views/PeopleView";
+import { ProjectsView } from "./views/ProjectsView";
 import { ReportsView } from "./views/ReportsView";
 import { SettingsView } from "./views/SettingsView";
 import { ChatView } from "./views/ChatView";
@@ -30,6 +31,7 @@ interface Route {
 
 const TOP_VIEWS: TopView[] = [
   "home",
+  "projects",
   "mywork",
   "everything",
   "lineup",
@@ -119,6 +121,8 @@ export default function Workspace() {
           />
         ) : route.view === "home" ? (
           <HomeView onOpenProject={openProject} onNavigate={navigate} />
+        ) : route.view === "projects" ? (
+          <ProjectsView onOpenProject={openProject} />
         ) : route.view === "mywork" ? (
           <MyWorkView onOpenProject={openProject} />
         ) : route.view === "everything" ? (

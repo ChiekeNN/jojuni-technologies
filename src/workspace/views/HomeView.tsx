@@ -3,7 +3,6 @@
  * three seconds — what is late, what is coming, what changed, where to go.
  */
 import {
-  ArrowUpRight,
   CalendarDays,
   CheckSquare2,
   Clock3,
@@ -24,6 +23,7 @@ import {
   isOverdue,
   overdueTodos,
   projectProgress,
+  projectServiceLabel,
   relativeTime,
   upcomingEvents,
   type ID,
@@ -112,60 +112,67 @@ export function HomeView({
           <Panel>
             <div className="mb-3 flex items-baseline justify-between">
               <h2 className="text-sm font-bold text-black">Projects</h2>
-              <button type="button" onClick={() => onNavigate("lineup")} className="text-[11px] font-semibold text-black/40 hover:text-black">
-                Lineup →
+              <button
+                type="button"
+                onClick={() => onNavigate("projects")}
+                className="text-[11px] font-semibold text-black/40 hover:text-black"
+              >
+                See all {activeProjects.length} →
               </button>
             </div>
-            <div className="grid gap-2.5 [&>*]:min-w-0 sm:grid-cols-2">
-              {activeProjects.map((project) => {
-                const progress = projectProgress(state, project.id);
-                const members = state.people.filter((person) => project.members.includes(person.id));
-                const daysLeft = daysUntil(project.end);
-                return (
-                  <button
-                    key={project.id}
-                    type="button"
-                    onClick={() => onOpenProject(project.id)}
-                    className="group min-w-0 rounded-lg border border-black/10 p-3 text-left transition hover:border-black/30 hover:bg-black/[0.015]"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="grid h-6 w-6 shrink-0 place-items-center rounded text-[9px] font-black text-white"
-                        style={{ backgroundColor: project.color }}
+            {/* Home lists the three nearest deadlines. The full card grid lives
+                on the Projects page, so the dashboard stays a glance rather
+                than repeating that page in miniature. */}
+            <ul className="divide-y divide-black/6">
+              {[...activeProjects]
+                .sort((a, b) => a.end.localeCompare(b.end))
+                .slice(0, 3)
+                .map((project) => {
+                  const progress = projectProgress(state, project.id);
+                  const daysLeft = daysUntil(project.end);
+                  return (
+                    <li key={project.id}>
+                      <button
+                        type="button"
+                        onClick={() => onOpenProject(project.id)}
+                        className="flex w-full items-center gap-2 py-2 text-left"
                       >
-                        {project.code}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-xs font-bold text-black">{project.name}</span>
-                      <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-black/20 transition group-hover:text-black/50" />
-                    </div>
-                    <p className="mt-1.5 truncate text-[11px] text-black/45">{project.client}</p>
-                    <div className="mt-2 flex items-center gap-2">
-                      <ProgressBar value={progress} color={project.color} />
-                      <span className="shrink-0 text-[10px] font-semibold tabular-nums text-black/45">{progress}%</span>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between">
-                      <div className="flex -space-x-1">
-                        {members.slice(0, 4).map((person) => (
-                          <Avatar key={person.id} person={person} size="xs" ring />
-                        ))}
-                      </div>
-                      <span
-                        className={cx(
-                          "text-[10px]",
-                          daysLeft !== null && daysLeft < 0
-                            ? "font-semibold text-[#d90429]"
-                            : daysLeft !== null && daysLeft <= 7
-                              ? "font-semibold text-amber-600"
-                              : "text-black/35",
-                        )}
-                      >
-                        {daysLeft !== null && daysLeft < 0 ? `${Math.abs(daysLeft)}d over` : `ends ${dueLabel(project.end)}`}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+                        <span
+                          className="grid h-6 w-6 shrink-0 place-items-center rounded text-[9px] font-black text-white"
+                          style={{ backgroundColor: project.color }}
+                        >
+                          {project.code}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs font-semibold text-black/85">{project.name}</span>
+                          <span className="block truncate text-[10px] text-black/35">
+                            {project.client}
+                            {projectServiceLabel(project) ? ` · ${projectServiceLabel(project)}` : ""}
+                          </span>
+                        </span>
+                        <span className="hidden w-20 shrink-0 sm:block">
+                          <ProgressBar value={progress} color={project.color} />
+                        </span>
+                        <span className="w-8 shrink-0 text-right text-[10px] font-semibold tabular-nums text-black/45">
+                          {progress}%
+                        </span>
+                        <span
+                          className={cx(
+                            "w-20 shrink-0 text-right text-[10px]",
+                            daysLeft !== null && daysLeft < 0
+                              ? "font-semibold text-[#d90429]"
+                              : daysLeft !== null && daysLeft <= 7
+                                ? "font-semibold text-amber-600"
+                                : "text-black/35",
+                          )}
+                        >
+                          {daysLeft !== null && daysLeft < 0 ? `${Math.abs(daysLeft)}d over` : `ends ${dueLabel(project.end)}`}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+            </ul>
           </Panel>
 
           <Panel>

@@ -19,7 +19,6 @@ import {
   Network,
   MessageCircle,
   NotebookPen,
-  Plus,
   Search,
   Settings,
   Users,
@@ -27,7 +26,6 @@ import {
 } from "lucide-react";
 
 import { Avatar, Chip, cx } from "./ui";
-import { useNewProject } from "./NewProjectModal";
 import { totalUnread } from "./chat";
 import {
   dueLabel,
@@ -40,6 +38,7 @@ import {
 
 export type TopView =
   | "home"
+  | "projects"
   | "mywork"
   | "everything"
   | "lineup"
@@ -56,6 +55,7 @@ export interface NavCounts {
 
 const topNav: { id: TopView; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Home", icon: Home },
+  { id: "projects", label: "Projects", icon: FolderKanban },
   { id: "mywork", label: "My work", icon: CheckSquare2 },
   { id: "everything", label: "Everything", icon: LayoutGrid },
   { id: "lineup", label: "Lineup", icon: CalendarDays },
@@ -91,11 +91,9 @@ export function Shell({
 
   const me = state.people.find((person) => person.id === state.currentUserId);
   const activeProjects = state.projects.filter((project) => project.status === "active");
-  const archived = state.projects.filter((project) => project.status === "archived");
   const openTodos = state.todos.filter((todo) => !todo.done).length;
   const overdueCount = overdueTodos(state).length;
   const unread = state.chats.filter((chat) => relativeTime(chat.createdAt).includes("min")).length;
-  const newProject = useNewProject();
 
   // Every navigable destination, searched by the command palette.
   const destinations = useMemo(() => {
@@ -223,7 +221,7 @@ export function Shell({
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
         <SidebarGroup>
-          {topNav.slice(0, 5).map((item) => (
+          {topNav.slice(0, 6).map((item) => (
             <SidebarLink
               key={item.id}
               active={view === item.id && !activeProjectId}
@@ -235,48 +233,9 @@ export function Shell({
           ))}
         </SidebarGroup>
 
-        <SidebarLabel
-          action={
-            <button
-              type="button"
-              onClick={newProject}
-              aria-label="New project"
-              title="New project"
-              className="rounded p-0.5 text-white/30 transition hover:bg-white/10 hover:text-white"
-            >
-              <Plus className="h-3 w-3" />
-            </button>
-          }
-        >
-          Projects
-        </SidebarLabel>
-        <div className="space-y-0.5">
-          {activeProjects.map((project) => (
-            <SidebarLink
-              key={project.id}
-              active={activeProjectId === project.id}
-              onClick={() => openProject(project.id)}
-              icon={
-                <span
-                  className="grid h-4 w-4 shrink-0 place-items-center rounded-sm text-[8px] font-black text-white"
-                  style={{ backgroundColor: project.color }}
-                >
-                  {project.code.slice(0, 2)}
-                </span>
-              }
-              label={project.name}
-            />
-          ))}
-          {archived.length > 0 && (
-            <p className="px-2 pt-2 text-[10px] uppercase tracking-[0.1em] text-white/25">
-              {archived.length} archived
-            </p>
-          )}
-        </div>
-
         <SidebarLabel>Workspace</SidebarLabel>
         <SidebarGroup>
-          {topNav.slice(5).map((item) => (
+          {topNav.slice(6).map((item) => (
             <SidebarLink
               key={item.id}
               active={view === item.id && !activeProjectId}
