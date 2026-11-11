@@ -8,9 +8,11 @@ import { Download, RotateCcw, ShieldCheck, Upload } from "lucide-react";
 import { useWorkspace } from "../store";
 import { initialsOf, type ID } from "../model";
 import { Avatar, Button, Chip, Field, Panel, Select, TextInput } from "../ui";
+import { useEditProject } from "../NewProjectModal";
 
 export function SettingsView({ onOpenProject }: { onOpenProject: (projectId: ID) => void }) {
   const { state, actions, resetToSample, exportJSON, importJSON } = useWorkspace();
+  const editProject = useEditProject();
   const me = state.people.find((person) => person.id === state.currentUserId);
   const [name, setName] = useState(me?.name ?? "");
   const [title, setTitle] = useState(me?.title ?? "");
@@ -95,6 +97,7 @@ export function SettingsView({ onOpenProject }: { onOpenProject: (projectId: ID)
                   {project.name}
                 </button>
                 {project.status === "archived" && <Chip>Archived</Chip>}
+                <Button onClick={() => editProject(project.id)}>Edit</Button>
                 <Button onClick={() => actions.archiveProject(project.id, project.status !== "archived")}>
                   {project.status === "archived" ? "Restore" : "Archive"}
                 </Button>

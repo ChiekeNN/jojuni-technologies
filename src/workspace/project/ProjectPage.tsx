@@ -29,6 +29,7 @@ import { assignablePeople,
   type ID,
 } from "../model";
 import { Avatar, AvatarStack, Button, Chip, Panel, ProgressBar, cx } from "../ui";
+import { useEditProject } from "../NewProjectModal";
 import { BoardTab } from "./BoardTab";
 import { CampfireTab } from "./CampfireTab";
 import { CardsTab } from "./CardsTab";
@@ -75,6 +76,7 @@ export function ProjectPage({
   onTab: (tab: ProjectTabId) => void;
   onBack: () => void;
 }) {
+  const editProject = useEditProject();
   const { state, actions } = useWorkspace();
   const [clientView, setClientView] = useState(false);
   const project = state.projects.find((item) => item.id === projectId);
@@ -125,6 +127,7 @@ export function ProjectPage({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <AvatarStack people={members} max={5} />
+            <Button onClick={() => editProject(project.id)}>Edit</Button>
             <button
               type="button"
               onClick={() => setClientView((on) => !on)}
