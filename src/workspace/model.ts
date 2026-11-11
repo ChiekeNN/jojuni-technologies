@@ -71,6 +71,12 @@ export interface Person {
   company?: string;
   /** True when a vendor works for themselves rather than through a company. */
   freelance?: boolean;
+  /**
+   * Web address, stored as typed. A client's site is the fastest way to check
+   * what a company actually does before a call, and it belongs with the rest of
+   * the contact details rather than in a project note somewhere.
+   */
+  website?: string;
   createdAt?: string;
 }
 
@@ -483,6 +489,23 @@ export function whatsappHref(value: string): string {
   if (digits.startsWith("234")) return `https://wa.me/${digits}`;
   if (digits.startsWith("0")) return `https://wa.me/234${digits.slice(1)}`;
   return `https://wa.me/${digits}`;
+}
+
+/**
+ * Website link. People type `example.com` as often as `https://example.com`,
+ * and a bare host in an href resolves relative to the workspace, so add the
+ * scheme when it is missing.
+ */
+export function websiteHref(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed.replace(/^\/+/, "")}`;
+}
+
+/** What to print in the link: the address without the scheme or trailing slash. */
+export function websiteLabel(value: string): string {
+  return value.trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "");
 }
 
 export function initialsOf(name: string): string {
