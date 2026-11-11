@@ -7,6 +7,7 @@ import { Bookmark, Check, NotebookPen, Plus, Trash2 } from "lucide-react";
 import { useWorkspace } from "../store";
 import { dueLabel, isOverdue, relativeTime, type ID } from "../model";
 import { Avatar, Button, IconButton, Panel, TextArea, TextInput, cx } from "../ui";
+import { NewTaskModal } from "../NewTaskModal";
 
 type Tab = "tasks" | "notes" | "bookmarks";
 
@@ -14,6 +15,7 @@ export function MyWorkView({ onOpenProject }: { onOpenProject: (projectId: ID, t
   const { state, actions } = useWorkspace();
   const [tab, setTab] = useState<Tab>("tasks");
   const [activeNote, setActiveNote] = useState<ID | null>(state.notes[0]?.id ?? null);
+  const [newTask, setNewTask] = useState(false);
 
   const mine = state.todos.filter((todo) => !todo.done && (todo.assigneeId === state.currentUserId || todo.assigneeId === ""));
   const cards = state.cards.filter((card) => card.assigneeId === state.currentUserId);
@@ -41,7 +43,13 @@ export function MyWorkView({ onOpenProject }: { onOpenProject: (projectId: ID, t
             {mine.length} open to-dos · {cards.length} cards · {state.notes.length} notes
           </p>
         </div>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap items-center gap-1">
+          {tab === "tasks" && (
+            <Button tone="primary" onClick={() => setNewTask(true)} className="mr-1">
+              <Plus className="h-3.5 w-3.5" /> New task
+            </Button>
+          )}
+          <div className="flex gap-1">
           {(
             [
               { id: "tasks", label: "Tasks", icon: Check },
@@ -61,6 +69,7 @@ export function MyWorkView({ onOpenProject }: { onOpenProject: (projectId: ID, t
               <item.icon className="h-3.5 w-3.5" /> {item.label}
             </button>
           ))}
+          </div>
         </div>
       </header>
 
@@ -173,6 +182,8 @@ export function MyWorkView({ onOpenProject }: { onOpenProject: (projectId: ID, t
         </div>
       )}
 
+      <NewTaskModal open={newTask} onClose={() => setNewTask(false)} />
+
       {tab === "bookmarks" && (
         <Panel>
           <h2 className="mb-2 text-sm font-bold text-black">Bookmarks</h2>
@@ -263,6 +274,9 @@ function TaskRow({ todoId, onOpenProject }: { todoId: ID; onOpenProject: (projec
         {dueLabel(todo.due)}
       </span>
       <Avatar person={person} size="xs" />
+      <IconButton label={`Delete ${todo.title}`} tone="danger" onClick={() => actions.deleteTodo(todo.id)}>
+        <Trash2 className="h-3 w-3" />
+      </IconButton>
     </div>
   );
 }

@@ -19,6 +19,7 @@ import {
   Network,
   MessageCircle,
   NotebookPen,
+  Plus,
   Search,
   Settings,
   Users,
@@ -26,6 +27,7 @@ import {
 } from "lucide-react";
 
 import { Avatar, Chip, cx } from "./ui";
+import { useNewProject } from "./NewProjectModal";
 import { totalUnread } from "./chat";
 import {
   dueLabel,
@@ -93,6 +95,7 @@ export function Shell({
   const openTodos = state.todos.filter((todo) => !todo.done).length;
   const overdueCount = overdueTodos(state).length;
   const unread = state.chats.filter((chat) => relativeTime(chat.createdAt).includes("min")).length;
+  const newProject = useNewProject();
 
   // Every navigable destination, searched by the command palette.
   const destinations = useMemo(() => {
@@ -232,7 +235,21 @@ export function Shell({
           ))}
         </SidebarGroup>
 
-        <SidebarLabel>Projects</SidebarLabel>
+        <SidebarLabel
+          action={
+            <button
+              type="button"
+              onClick={newProject}
+              aria-label="New project"
+              title="New project"
+              className="rounded p-0.5 text-white/30 transition hover:bg-white/10 hover:text-white"
+            >
+              <Plus className="h-3 w-3" />
+            </button>
+          }
+        >
+          Projects
+        </SidebarLabel>
         <div className="space-y-0.5">
           {activeProjects.map((project) => (
             <SidebarLink
@@ -475,9 +492,12 @@ function SidebarGroup({ children }: { children: ReactNode }) {
   return <div className="space-y-0.5">{children}</div>;
 }
 
-function SidebarLabel({ children }: { children: ReactNode }) {
+function SidebarLabel({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
-    <p className="mb-1 mt-5 px-2 text-[10px] font-bold uppercase tracking-[0.14em] text-white/30">{children}</p>
+    <div className="mb-1 mt-5 flex items-center justify-between px-2">
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/30">{children}</p>
+      {action}
+    </div>
   );
 }
 

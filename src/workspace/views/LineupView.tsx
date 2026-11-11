@@ -5,13 +5,16 @@ import { useMemo, useState } from "react";
 
 import { useWorkspace } from "../store";
 import { daysUntil, formatDate, projectProgress, type Project } from "../model";
-import { Panel, cx } from "../ui";
+import { Button, Panel, cx } from "../ui";
+import { useNewProject } from "../NewProjectModal";
+import { Plus } from "lucide-react";
 
 const DAY = 86_400_000;
 
 export function LineupView({ onOpenProject }: { onOpenProject: (projectId: string) => void }) {
   const { state } = useWorkspace();
   const [includeArchived, setIncludeArchived] = useState(false);
+  const newProject = useNewProject();
   const [zoom, setZoom] = useState<"fit" | "90" | "180">("fit");
 
   const projects = state.projects.filter((project) => includeArchived || project.status === "active");
@@ -65,6 +68,9 @@ export function LineupView({ onOpenProject }: { onOpenProject: (projectId: strin
           <p className="mt-1 text-sm text-black/50">Every project on one timeline, so overlaps are obvious.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button tone="primary" onClick={newProject}>
+            <Plus className="h-3.5 w-3.5" /> New project
+          </Button>
           <label className="flex items-center gap-1.5 text-[11px] text-black/50">
             <input
               type="checkbox"

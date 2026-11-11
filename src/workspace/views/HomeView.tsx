@@ -2,7 +2,6 @@
  * Home: the workspace dashboard. Everything a super admin wants in the first
  * three seconds — what is late, what is coming, what changed, where to go.
  */
-import { useState } from "react";
 import {
   ArrowUpRight,
   CalendarDays,
@@ -27,11 +26,11 @@ import {
   projectProgress,
   relativeTime,
   upcomingEvents,
-  todayISO,
   type ID,
 } from "../model";
-import { Avatar, Button, Field, Modal, Panel, ProgressBar, Select, TextArea, TextInput, cx } from "../ui";
+import { Avatar, Button, Panel, ProgressBar, cx } from "../ui";
 import type { TopView } from "../Shell";
+import { useNewProject } from "../NewProjectModal";
 
 export function HomeView({
   onOpenProject,
@@ -41,7 +40,7 @@ export function HomeView({
   onNavigate: (view: TopView) => void;
 }) {
   const { state, actions } = useWorkspace();
-  const [newProject, setNewProject] = useState(false);
+  const newProject = useNewProject();
   const me = state.people.find((person) => person.id === state.currentUserId);
 
   const activeProjects = state.projects.filter((project) => project.status === "active");
@@ -71,7 +70,7 @@ export function HomeView({
             {activeProjects.length} active projects · {openTodos.length} open to-dos · {late.length} overdue
           </p>
         </div>
-        <Button tone="primary" onClick={() => setNewProject(true)}>
+        <Button tone="primary" onClick={newProject}>
           <Plus className="h-3.5 w-3.5" /> New project
         </Button>
       </header>
@@ -311,7 +310,6 @@ export function HomeView({
         </div>
       </div>
 
-      <NewProjectModal open={newProject} onClose={() => setNewProject(false)} onCreated={onOpenProject} />
     </div>
   );
 }
@@ -360,92 +358,6 @@ function Stat({
 const naira = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 });
 function formatNaira(value: number): string {
   return naira.format(value);
-}
-
-function NewProjectModal({
-  open,
-  onClose,
-  onCreated,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onCreated: (projectId: ID) => void;
-}) {
-  const { state, actions } = useWorkspace();
-  const [name, setName] = useState("");
-  const [client, setClient] = useState("");
-  const [description, setDescription] = useState("");
-  const [start, setStart] = useState(todayISO());
-  const [end, setEnd] = useState("");
-  const [color, setColor] = useState("#d90429");
-  const [clientVisible, setClientVisible] = useState(true);
-
-  const submit = () => {
-    if (!name.trim()) return;
-    const id = actions.addProject({
-      name: name.trim(),
-      code: name.trim().slice(0, 2).toUpperCase(),
-      client: client.trim() || "Internal",
-      description: description.trim(),
-      color,
-      start,
-      end: end || start,
-      status: "active",
-      members: [state.currentUserId],
-      clientVisible,
-    });
-    setName("");
-    setClient("");
-    setDescription("");
-    onClose();
-    onCreated(id);
-  };
-
-  return (
-    <Modal open={open} onClose={onClose} title="New project">
-      <div className="space-y-3">
-        <Field label="Project name">
-          <TextInput autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Meridian Commerce" />
-        </Field>
-        <Field label="Client">
-          <TextInput value={client} onChange={(event) => setClient(event.target.value)} placeholder="Client name, or Internal" />
-        </Field>
-        <Field label="Description">
-          <TextArea value={description} onChange={(event) => setDescription(event.target.value)} className="min-h-16" />
-        </Field>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Starts">
-            <TextInput type="date" value={start} onChange={(event) => setStart(event.target.value)} />
-          </Field>
-          <Field label="Target">
-            <TextInput type="date" value={end} onChange={(event) => setEnd(event.target.value)} />
-          </Field>
-          <Field label="Colour">
-            <input
-              type="color"
-              value={color}
-              onChange={(event) => setColor(event.target.value)}
-              className="h-[38px] w-full cursor-pointer rounded border border-black/15 bg-white p-1"
-            />
-          </Field>
-        </div>
-        <Field label="Client visibility">
-          <Select value={clientVisible ? "client" : "internal"} onChange={(event) => setClientVisible(event.target.value === "client")}>
-            <option value="client">Client can see this project</option>
-            <option value="internal">Internal only</option>
-          </Select>
-        </Field>
-        <div className="flex justify-end gap-2">
-          <Button tone="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button tone="primary" onClick={submit}>
-            Create project
-          </Button>
-        </div>
-      </div>
-    </Modal>
-  );
 }
 
 export { formatNaira };

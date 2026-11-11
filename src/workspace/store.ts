@@ -87,7 +87,8 @@ interface Actions {
   toggleProjectMember: (projectId: ID, personId: ID) => void;
 
   /* to-dos */
-  addTodoList: (projectId: ID, title: string) => void;
+  /** Returns the new list id, so a caller can add a task to it at once. */
+  addTodoList: (projectId: ID, title: string) => ID;
   addTodo: (input: { projectId: ID; listId: ID; title: string; assigneeId?: ID | ""; due?: string }) => void;
   updateTodo: (id: ID, patch: Partial<Todo>) => void;
   toggleTodo: (id: ID) => void;
@@ -274,11 +275,11 @@ export function useWorkspaceStore(): WorkspaceStore {
         })),
 
       /* ---------------- to-dos ---------------- */
-      addTodoList: (projectId, title) =>
-        commit((s) => ({
-          ...s,
-          todoLists: [...s.todoLists, { id: uid("list"), projectId, title, createdAt: now() }],
-        })),
+      addTodoList: (projectId, title) => {
+        const list: TodoList = { id: uid("list"), projectId, title, createdAt: now() };
+        commit((s) => ({ ...s, todoLists: [...s.todoLists, list] }));
+        return list.id;
+      },
 
       addTodo: ({ projectId, listId, title, assigneeId = "", due = "" }) =>
         commit((s) => ({

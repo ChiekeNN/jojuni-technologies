@@ -13,6 +13,7 @@ import { ProjectPage, slugForTab, tabByLabel, type ProjectTabId } from "./projec
 import { EverythingView } from "./views/EverythingView";
 import { HomeView } from "./views/HomeView";
 import { LineupView } from "./views/LineupView";
+import { NewProjectProvider } from "./NewProjectModal";
 import { MyWorkView } from "./views/MyWorkView";
 import { PeopleView } from "./views/PeopleView";
 import { ReportsView } from "./views/ReportsView";
@@ -101,6 +102,7 @@ export default function Workspace() {
 
   return (
     <WorkspaceContext.Provider value={store}>
+      <NewProjectProvider onCreated={openProject}>
       <Shell
         state={store.state}
         view={route.projectId ? "home" : route.view}
@@ -133,6 +135,7 @@ export default function Workspace() {
           <SettingsView onOpenProject={openProject} />
         )}
       </Shell>
+      </NewProjectProvider>
     </WorkspaceContext.Provider>
   );
 }
