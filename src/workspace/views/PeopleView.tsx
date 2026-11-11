@@ -20,6 +20,7 @@ import {
   Phone,
   Plus,
   Search,
+  Globe,
   Trash2,
   UserRound,
   Users,
@@ -35,6 +36,8 @@ import {
   projectProgress,
   splitName,
   telHref,
+  websiteHref,
+  websiteLabel,
   whatsappHref,
   type Person,
   type PersonCategory,
@@ -79,6 +82,7 @@ export function PeopleView({ onOpenProject }: { onOpenProject: (projectId: strin
           person.company,
           person.title,
           person.address,
+          person.website,
         ]
           .filter(Boolean)
           .join(" ")
@@ -209,6 +213,19 @@ export function PeopleView({ onOpenProject }: { onOpenProject: (projectId: strin
               {/* Contact details. The links are real: tel: and wa.me both work
                   from a phone, which is where anyone would use them. */}
               <ul className="mt-3 space-y-1">
+                {person.website && (
+                  <li>
+                    <a
+                      href={websiteHref(person.website)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1.5 text-[11px] text-black/50 hover:text-black"
+                    >
+                      <Globe className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{websiteLabel(person.website)}</span>
+                    </a>
+                  </li>
+                )}
                 {person.email && (
                   <li>
                     <a
@@ -250,7 +267,7 @@ export function PeopleView({ onOpenProject }: { onOpenProject: (projectId: strin
                     <span className="line-clamp-2">{person.address}</span>
                   </li>
                 )}
-                {!person.email && !person.phone && !person.whatsapp && !person.address && (
+                {!person.email && !person.phone && !person.whatsapp && !person.address && !person.website && (
                   <li className="text-[11px] text-black/30">No contact details yet.</li>
                 )}
               </ul>
@@ -413,16 +430,22 @@ function PersonForm({
   const [address, setAddress] = useState(person?.address ?? "");
   const [title, setTitle] = useState(person?.title ?? "");
   const [company, setCompany] = useState(person?.company ?? "");
+  const [website, setWebsite] = useState(person?.website ?? "");
   const [freelance, setFreelance] = useState(person?.freelance ?? false);
   const [color, setColor] = useState(person?.color ?? (category === "client" ? "#1d4ed8" : category === "vendor" ? "#b45309" : "#0f766e"));
   const [error, setError] = useState<string | null>(null);
 
   // Reset when the form is reopened for a different person. Keying the modal on
   // the person id would remount it, but the fields live here, so sync on open.
-  const formKey = `${open}-${person?.id ?? "new"}-${category}`;
-  const [lastKey, setLastKey] = useState(formKey);
+  const formKey = `${person?.id ?? "new"}-${category}`;
+  // Clearing the key on close is what makes a second "Add client" blank: the
+  // key alone is identical both times, so without this the last draft came back
+  // and the next client inherited the previous one's website.
+  const [lastKey, setLastKey] = useState<string | null>(null);
+  if (!open && lastKey !== null) setLastKey(null);
   if (open && formKey !== lastKey) {
     setLastKey(formKey);
+    setColor(person?.color ?? (category === "client" ? "#1d4ed8" : category === "vendor" ? "#b45309" : "#0f766e"));
     setFirstName(person?.firstName ?? (person ? splitName(person.name).first : ""));
     setLastName(person?.lastName ?? (person ? splitName(person.name).last : ""));
     setPhone(person?.phone ?? "");
@@ -431,6 +454,7 @@ function PersonForm({
     setAddress(person?.address ?? "");
     setTitle(person?.title ?? "");
     setCompany(person?.company ?? "");
+    setWebsite(person?.website ?? "");
     setFreelance(person?.freelance ?? false);
     setError(null);
   }
@@ -458,6 +482,7 @@ function PersonForm({
       whatsapp: whatsapp.trim(),
       address: address.trim(),
       company: company.trim(),
+      website: website.trim(),
       freelance: category === "vendor" ? freelance : undefined,
       color,
       category,
@@ -513,11 +538,20 @@ function PersonForm({
         </div>
 
         {category === "client" && (
-          <div className="sm:col-span-2">
+          <>
             <Field label="Company name" hint="Required — this is who the invoice is made out to.">
               <TextInput value={company} onChange={(event) => setCompany(event.target.value)} placeholder="e.g. Aviel Karis Limited" />
             </Field>
-          </div>
+            <Field label="Website" hint="Optional. example.com is fine — the link adds https://.">
+              <TextInput
+                type="text"
+                inputMode="url"
+                value={website}
+                onChange={(event) => setWebsite(event.target.value)}
+                placeholder="e.g. avielkaris.com"
+              />
+            </Field>
+          </>
         )}
 
         {category === "vendor" && (
