@@ -23,6 +23,7 @@ import { assignablePeople,
   hillForProject,
   isOverdue,
   projectProgress,
+  projectServiceLabel,
   relativeTime,
   upcomingEvents,
   hillPoint,
@@ -331,6 +332,12 @@ function Overview({
               <dt className="text-black/40">Client</dt>
               <dd className="font-semibold text-black/75">{project.client}</dd>
             </div>
+            {projectServiceLabel(project) && (
+              <div className="flex justify-between gap-2">
+                <dt className="text-black/40">Service</dt>
+                <dd className="text-right font-semibold text-black/75">{projectServiceLabel(project)}</dd>
+              </div>
+            )}
             <div className="flex justify-between gap-2">
               <dt className="text-black/40">Started</dt>
               <dd className="font-semibold text-black/75">{dueLabel(project.start)}</dd>

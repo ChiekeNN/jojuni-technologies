@@ -34,15 +34,21 @@ import {
   peopleCounts,
   personSubtitle,
   projectProgress,
+  projectServiceLabel,
+  projectYear,
+  projectsForClient,
   splitName,
   telHref,
   websiteHref,
   websiteLabel,
   whatsappHref,
+  type ID,
   type Person,
   type PersonCategory,
 } from "../model";
 import { Avatar, Button, Chip, Field, IconButton, Modal, Panel, ProgressBar, Select, TextArea, TextInput, cx } from "../ui";
+import { useEditProject, useNewProjectForClient } from "../NewProjectModal";
+import { formatNaira } from "./HomeView";
 
 const TABS: { id: PersonCategory | "all"; label: string; icon: typeof Users }[] = [
   { id: "all", label: "Everyone", icon: Users },
@@ -57,8 +63,28 @@ const CATEGORY_LABEL: Record<PersonCategory, string> = {
   vendor: "Vendor",
 };
 
-export function PeopleView({ onOpenProject }: { onOpenProject: (projectId: string) => void }) {
+/**
+ * Money received from a client, taken from the ledger.
+ *
+ * Matched on the ledger's counterparty, which is how the books already record
+ * who paid. Only real entries exist in the ledger, so this figure is always a
+ * record of something that happened rather than an estimate.
+ */
+function clientRevenue(state: { ledger: { type: string; amount: number; counterparty?: string }[] }, client: Person): number {
+  const names = [client.company, client.name].filter(Boolean).map((value) => normaliseCompany(value as string));
+  return state.ledger
+    .filter((entry) => entry.type === "Income" && entry.counterparty && names.includes(normaliseCompany(entry.counterparty)))
+    .reduce((sum, entry) => sum + entry.amount, 0);
+}
+
+function normaliseCompany(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export function PeopleView({ onOpenProject }: { onOpenProject: (projectId: ID) => void }) {
   const { state, actions } = useWorkspace();
+  const addProjectForClient = useNewProjectForClient();
+  const editProject = useEditProject();
   const [tab, setTab] = useState<PersonCategory | "all">("all");
   const [query, setQuery] = useState("");
   const [adding, setAdding] = useState<PersonCategory | null>(null);
@@ -164,14 +190,20 @@ export function PeopleView({ onOpenProject }: { onOpenProject: (projectId: strin
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {visible.map((person) => {
           const category = person.category ?? "staff";
+          // Staff: work assigned to them. Clients: work done for them. The
+          // client list is the client's history, newest first — the logo one
+          // year, the site the next — which is the whole reason they are here.
           const projects =
-            category === "staff"
-              ? state.projects.filter((project) => project.members.includes(person.id))
-              : [];
+            category === "client"
+              ? projectsForClient(state, person.id)
+              : category === "staff"
+                ? state.projects.filter((project) => project.members.includes(person.id))
+                : [];
           const openTodos =
             category === "staff"
               ? state.todos.filter((todo) => todo.assigneeId === person.id && !todo.done).length
               : 0;
+          const revenue = category === "client" ? clientRevenue(state, person) : 0;
           const doneTodos =
             category === "staff"
               ? state.todos.filter((todo) => todo.assigneeId === person.id && todo.done).length
@@ -271,6 +303,64 @@ export function PeopleView({ onOpenProject }: { onOpenProject: (projectId: strin
                   <li className="text-[11px] text-black/30">No contact details yet.</li>
                 )}
               </ul>
+
+              {category === "client" && (
+                <>
+                  <div className="mb-1 mt-3 flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-black/35">
+                        Work done for them ({projects.length})
+                      </p>
+                      {revenue > 0 && (
+                        <p className="text-[10px] font-semibold text-emerald-700">Paid {formatNaira(revenue)}</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => addProjectForClient(person.id)}
+                      className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-semibold text-black/45 transition hover:bg-black/5 hover:text-black"
+                    >
+                      <Plus className="h-3 w-3" /> Add project
+                    </button>
+                  </div>
+                  <ul className="space-y-1">
+                    {projects.map((project) => (
+                      <li key={project.id} className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onOpenProject(project.id)}
+                          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                        >
+                          <span className="shrink-0 rounded bg-black/5 px-1 py-px text-[9px] font-bold tabular-nums text-black/45">
+                            {projectYear(project)}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[11px] font-semibold text-black/70 hover:text-black">
+                              {projectServiceLabel(project) || project.name}
+                            </span>
+                            <span className="block truncate text-[10px] text-black/35">
+                              {projectServiceLabel(project) ? project.name : project.status}
+                              {project.status === "archived" ? " · archived" : ""}
+                            </span>
+                          </span>
+                          <span className="shrink-0 text-[10px] tabular-nums text-black/30">
+                            {projectProgress(state, project.id)}%
+                          </span>
+                        </button>
+                        <IconButton label={`Edit ${project.name}`} onClick={() => editProject(project.id)}>
+                          <Pencil className="h-3 w-3" />
+                        </IconButton>
+                      </li>
+                    ))}
+                    {!projects.length && (
+                      <li className="text-[11px] leading-relaxed text-black/35">
+                        No work recorded yet. Use <span className="font-semibold text-black/50">Add project</span> to log
+                        the first thing you did for them.
+                      </li>
+                    )}
+                  </ul>
+                </>
+              )}
 
               {category === "staff" && (
                 <>

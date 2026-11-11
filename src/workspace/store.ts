@@ -200,9 +200,13 @@ export function useWorkspaceStore(): WorkspaceStore {
         commit((s) => ({
           ...s,
           people: s.people.filter((person) => person.id !== id),
+          // A removed client leaves their projects behind: the work is real
+          // history, and the project keeps the client's name as text. Only the
+          // link is dropped, so nothing points at a person who is gone.
           projects: s.projects.map((project) => ({
             ...project,
             members: project.members.filter((memberId) => memberId !== id),
+            clientId: project.clientId === id ? undefined : project.clientId,
           })),
           // Unassign rather than delete the work: losing a to-do because its
           // owner left would be a far worse bug than an unassigned one.

@@ -85,7 +85,21 @@ export interface Project {
   name: string;
   /** Short reference shown in dense lists, e.g. `MC`. */
   code: string;
+  /** The client's name as text. Kept so a project always displays something. */
   client: string;
+  /**
+   * The client record this work was done for.
+   *
+   * `client` above started life as free text, which meant a client card could
+   * not say what we had done for them — the two halves of the same fact were
+   * not connected. This is the connection. Optional, so projects saved before
+   * it existed keep loading; `loadState` backfills it where the text matches.
+   */
+  clientId?: ID;
+  /** What was sold for this client: a `SERVICE_OPTIONS` title. */
+  service?: string;
+  /** The sub-service under `service`, e.g. `Business Websites`. */
+  serviceItem?: string;
   description: string;
   color: string;
   /** ISO dates, `YYYY-MM-DD`. */
@@ -464,6 +478,28 @@ export function splitName(name: string): { first: string; last: string } {
  * out and how anyone looks them up. A freelance vendor has no company, so the
  * service they provide is the useful line instead.
  */
+/**
+ * Every project done for a client, newest first.
+ *
+ * This is the purpose a client exists for: the logo one year, the site the
+ * next, SEO after that. Newest first so the card reads as recent history.
+ */
+export function projectsForClient(state: WorkspaceState, clientId: ID): Project[] {
+  return state.projects
+    .filter((project) => project.clientId === clientId)
+    .sort((a, b) => b.start.localeCompare(a.start));
+}
+
+/** The label to print for what a project was: sub-service first, then service. */
+export function projectServiceLabel(project: Project): string {
+  return project.serviceItem || project.service || "";
+}
+
+/** Calendar year a project began, for the history list. */
+export function projectYear(project: Project): string {
+  return (project.start || project.createdAt || "").slice(0, 4);
+}
+
 export function personSubtitle(person: Person): string {
   if (person.category === "client") return person.company || person.title || "Client";
   if (person.category === "vendor") {
@@ -697,6 +733,10 @@ export function loadState(): WorkspaceState | null {
     // Chat was added after the first v3 saves were in the wild. A workspace
     // from before it simply gains an empty one rather than being thrown away.
     if (!parsed.chat) parsed.chat = EMPTY_CHAT_STATE;
+    // Projects used to name their client in text only. Link them to the client
+    // record where the name matches, so an existing workspace starts showing
+    // client history immediately instead of waiting to be re-entered by hand.
+    parsed.projects = linkProjectClients(parsed.projects, parsed.people);
     return parsed;
   } catch {
     return null;
@@ -728,7 +768,36 @@ export function importState(json: string): WorkspaceState {
   if (!parsed || parsed.version !== WORKSPACE_STATE_VERSION || !Array.isArray(parsed.projects)) {
     throw new Error("That file is not a Jojuni workspace backup.");
   }
+  parsed.projects = linkProjectClients(parsed.projects, parsed.people);
   return parsed;
+}
+
+/** "Meridian Retail" on a project matches "Meridian Retail" as a client company. */
+function normaliseName(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/**
+ * Attach a client record to projects that only carry the client's name.
+ *
+ * Matches the project's `client` text against a client's company, then their
+ * full name. Only fills a gap: a project already linked is left alone. A name
+ * that matches nothing stays free text, which is what an internal or retainer
+ * project is.
+ */
+export function linkProjectClients(projects: Project[], people: Person[]): Project[] {
+  const clients = people.filter((person) => (person.category ?? "staff") === "client");
+  if (!clients.length) return projects;
+  const byName = new Map<string, ID>();
+  for (const client of clients) {
+    if (client.company) byName.set(normaliseName(client.company), client.id);
+    byName.set(normaliseName(client.name), client.id);
+  }
+  return projects.map((project) => {
+    if (project.clientId) return project;
+    const match = byName.get(normaliseName(project.client));
+    return match ? { ...project, clientId: match } : project;
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -755,6 +824,8 @@ export function createInitialState(): WorkspaceState {
       name: "Meridian Commerce",
       code: "MC",
       client: "Meridian Retail",
+      service: "Web Development",
+      serviceItem: "Online Stores",
       description: "Storefront and checkout rebuild, with a catalogue the marketing team can edit themselves.",
       color: "#d90429",
       start: dateDaysFromNow(-64),
@@ -769,6 +840,8 @@ export function createInitialState(): WorkspaceState {
       name: "Northstar Mobile",
       code: "NM",
       client: "Northstar Health",
+      service: "Software & App Development",
+      serviceItem: "Mobile Apps",
       description: "Patient follow-up app for private clinics: reminders, visit history and secure messaging.",
       color: "#111111",
       start: dateDaysFromNow(-38),
@@ -783,6 +856,8 @@ export function createInitialState(): WorkspaceState {
       name: "Jojuni Automation",
       code: "JA",
       client: "Internal",
+      service: "Business Automation",
+      serviceItem: "Task Automation",
       description: "Our own delivery workspace: project boards, client files and reporting in one place.",
       color: "#6f6f6f",
       start: dateDaysFromNow(-120),
@@ -797,6 +872,8 @@ export function createInitialState(): WorkspaceState {
       name: "Website Care",
       code: "WC",
       client: "Retainer",
+      service: "Web Development",
+      serviceItem: "Website Care",
       description: "Monthly maintenance, monitoring and content updates for client sites on retainer.",
       color: "#0f766e",
       start: dateDaysFromNow(-200),
