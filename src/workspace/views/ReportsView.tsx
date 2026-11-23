@@ -155,7 +155,7 @@ export function FinancePanel() {
       .filter(
         (entry) =>
           !needle ||
-          `${entry.description} ${entry.category} ${entry.service ?? ""} ${entry.serviceItem ?? ""} ${entry.counterparty ?? ""} ${entry.method ?? ""}`
+          `${entry.description} ${entry.category} ${entry.service ?? ""} ${entry.serviceItem ?? ""} ${entry.counterparty ?? ""}`
             .toLowerCase()
             .includes(needle),
       )
@@ -406,9 +406,6 @@ export function FinancePanel() {
                       {entry.serviceItem ?? entry.service}
                     </span>
                   )}
-                  {entry.method && entry.method !== entry.bank && (
-                    <span className="rounded bg-black/5 px-1 py-px text-black/45">{entry.method}</span>
-                  )}
                   {entry.bank && (
                     <span
                       className="flex max-w-full items-center gap-1 rounded px-1 py-px font-semibold"
@@ -597,22 +594,12 @@ export function FinancePanel() {
               <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-black/35">Description</p>
               <p className="text-base font-semibold leading-snug text-black">{viewing.description}</p>
             </div>
-            {(viewing.counterparty || viewing.method) && (
-              <div className="grid gap-2 sm:grid-cols-2">
-                {viewing.counterparty && (
-                  <div className="rounded border border-black/8 bg-black/[0.02] px-3 py-2">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-black/35">
-                      {viewing.type === "Income" ? "Paid by" : "Paid to"}
-                    </p>
-                    <p className="text-sm font-semibold text-black">{viewing.counterparty}</p>
-                  </div>
-                )}
-                {viewing.method && (
-                  <div className="rounded border border-black/8 bg-black/[0.02] px-3 py-2">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-black/35">How it moved</p>
-                    <p className="text-sm font-semibold text-black">{viewing.method}</p>
-                  </div>
-                )}
+            {viewing.counterparty && (
+              <div className="rounded border border-black/8 bg-black/[0.02] px-3 py-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-black/35">
+                  {viewing.type === "Income" ? "Paid by" : "Paid to"}
+                </p>
+                <p className="text-sm font-semibold text-black">{viewing.counterparty}</p>
               </div>
             )}
 
@@ -763,7 +750,6 @@ function EntryForm({
   const [bank, setBank] = useState(
     initial?.bank ?? (initial?.type === "Expense" ? "" : INCOME_BANKS[0]?.name ?? ""),
   );
-  const [method, setMethod] = useState(initial?.method ?? "");
   const [counterparty, setCounterparty] = useState(initial?.counterparty ?? "");
   const [error, setError] = useState<string | null>(null);
 
@@ -818,7 +804,6 @@ function EntryForm({
       serviceItem: isIncome && serviceItem ? serviceItem : undefined,
       projectId: projectId || undefined,
       bank,
-      method: method || undefined,
       counterparty: counterparty.trim() || undefined,
     });
   };
@@ -937,19 +922,6 @@ function EntryForm({
             value={counterparty}
             onChange={(event) => setCounterparty(event.target.value)}
             placeholder={isIncome ? "e.g. Western Dada Limited" : "e.g. Fidelity Bank"}
-          />
-        </Field>
-      </div>
-
-      <div className="lg:col-span-2">
-        <Field
-          label="How it moved"
-          hint={method ? undefined : "Optional — OPay, transfer, card, cheque."}
-        >
-          <TextInput
-            value={method}
-            onChange={(event) => setMethod(event.target.value)}
-            placeholder="e.g. OPay, bank transfer"
           />
         </Field>
       </div>
