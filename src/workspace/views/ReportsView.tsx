@@ -9,16 +9,20 @@ import { daysUntil, dueLabel, formatDate, hillForProject, isOverdue, projectProg
 import { Button, Chip, Field, IconButton, Modal, Panel, ProgressBar, Select, TextInput, cx } from "../ui";
 import { formatNaira } from "./HomeView";
 import {
-  EXPENSE_CATEGORIES,
+  EXPENSE_CATEGORY_GROUPS,
   INCOME_CATEGORIES,
   NON_SERVICE_INCOME,
   SERVICE_OPTIONS,
   isCapitalReason,
+  isKnownCategory,
   itemsForService,
 } from "../services";
 import { BANKS_SORTED, INCOME_BANKS, bankByName } from "../banks";
 import { exportLedger, exportSummary } from "../csv";
 import type { LedgerDraft } from "../store";
+
+/** Sentinel for the "type your own" option in the category picker. */
+const CUSTOM_CATEGORY = "__custom__";
 
 export function ReportsView({ onOpenProject }: { onOpenProject: (projectId: string) => void }) {
   const { state } = useWorkspace();
@@ -740,8 +744,17 @@ function EntryForm({
   onCancel: () => void;
 }) {
   const [description, setDescription] = useState(initial?.description ?? "");
-  const [category, setCategory] = useState(initial?.category ?? "Client income");
   const [type, setType] = useState<"Income" | "Expense">(initial?.type ?? "Income");
+  // A new expense starts with nothing picked: defaulting to "Infrastructure"
+  // quietly filed every flight and lawyer's invoice under hosting.
+  const [category, setCategory] = useState(
+    initial?.category ?? ((initial?.type ?? "Income") === "Income" ? "Client income" : ""),
+  );
+  // Categories are a short guided list plus free text. This tracks whether the
+  // entry uses the free-text escape hatch rather than a listed category.
+  const [customCategory, setCustomCategory] = useState(
+    !!initial?.category && !isKnownCategory(initial.category, initial?.type ?? "Income"),
+  );
   const [amount, setAmount] = useState(initial ? String(initial.amount) : "");
   const [date, setDate] = useState(initial?.date ?? todayISO());
   const [service, setService] = useState(initial?.service ?? "");
@@ -756,6 +769,12 @@ function EntryForm({
 
   const subItems = service ? itemsForService(service) : [];
   const isIncome = type === "Income";
+  // Income categories are a short flat list; expenses are grouped by area of
+  // spend so travel, payroll and professional fees are all findable.
+  const categoryGroups = isIncome
+    ? [{ label: "Income", items: INCOME_CATEGORIES }]
+    : EXPENSE_CATEGORY_GROUPS;
+  const categoryValue = customCategory ? CUSTOM_CATEGORY : category;
   // Money only arrives in accounts the company holds; it can leave for anywhere.
   const bankChoices = isIncome ? INCOME_BANKS : BANKS_SORTED;
   const isCapital = NON_SERVICE_INCOME.includes(service);
@@ -772,6 +791,10 @@ function EntryForm({
     }
     if (!date) {
       setError("Pick a date.");
+      return;
+    }
+    if (!category.trim()) {
+      setError("Pick a category, or choose “Other (type your own)” and name it.");
       return;
     }
     if (isIncome && !service) {
@@ -821,8 +844,11 @@ function EntryForm({
           onChange={(event) => {
             const next = event.target.value as "Income" | "Expense";
             setType(next);
-            // Fee categories make no sense on income, and vice versa.
-            setCategory(next === "Income" ? "Client income" : "Infrastructure");
+            // Fee categories make no sense on income, and vice versa. An
+            // expense starts blank so the full category list is shown rather
+            // than silently filing everything under one category.
+            setCategory(next === "Income" ? "Client income" : "");
+            setCustomCategory(false);
             // Income can only land in an account we hold, so a bank chosen for
             // an expense may not be a valid destination the other way round.
             setBank(next === "Income" ? INCOME_BANKS[0]?.name ?? "" : bank);
@@ -838,17 +864,48 @@ function EntryForm({
       <Field label="Date">
         <TextInput type="date" value={date} onChange={(event) => setDate(event.target.value)} />
       </Field>
-      <Field label="Category" hint="Pick one or type your own.">
-        <TextInput
-          value={category}
-          list="finance-category-options"
-          onChange={(event) => setCategory(event.target.value)}
-        />
-        <datalist id="finance-category-options">
-          {(isIncome ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((option) => (
-            <option key={option} value={option} />
+      <Field
+        label="Category"
+        hint={
+          customCategory
+            ? "Saved exactly as typed."
+            : "Pick one — or “Other (type your own)” for something we have not listed."
+        }
+      >
+        <Select
+          value={categoryValue}
+          onChange={(event) => {
+            const next = event.target.value;
+            if (next === CUSTOM_CATEGORY) {
+              setCustomCategory(true);
+              setCategory("");
+              return;
+            }
+            setCustomCategory(false);
+            setCategory(next);
+          }}
+        >
+          <option value="">Choose a category…</option>
+          {categoryGroups.map((group) => (
+            <optgroup key={group.label} label={group.label}>
+              {group.items.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </optgroup>
           ))}
-        </datalist>
+          <option value={CUSTOM_CATEGORY}>Other (type your own)…</option>
+        </Select>
+        {customCategory && (
+          <TextInput
+            autoFocus
+            className="mt-1.5"
+            value={category}
+            placeholder={isIncome ? "e.g. Interest earned" : "e.g. CEO travel — Lagos to Abuja"}
+            onChange={(event) => setCategory(event.target.value)}
+          />
+        )}
       </Field>
 
       <div className="lg:col-span-2">
