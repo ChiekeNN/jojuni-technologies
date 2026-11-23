@@ -280,12 +280,6 @@ export interface LedgerEntry {
    */
   bank?: string;
   /**
-   * How the money moved, when it was not a plain transfer into `bank` — an
-   * OPay transfer, a card, a cheque. Important for a statement trail: an OPay
-   * payment never appears on the bank statement at all.
-   */
-  method?: string;
-  /**
    * The other side of the transaction: the person or company who paid, or who
    * was paid. Free text, because counterparties are invoices and individuals
    * rather than a fixed list.
@@ -1324,7 +1318,6 @@ export function createInitialState(): WorkspaceState {
       amount: 500000,
       service: "Founder / take-off grant",
       bank: "OPay",
-      method: "OPay",
       counterparty: "Chieke Nwanna-Nzewunwa",
     },
     {
@@ -1336,7 +1329,6 @@ export function createInitialState(): WorkspaceState {
       amount: 200000,
       service: "Founder / take-off grant",
       bank: "OPay",
-      method: "OPay",
       counterparty: "Chieke Nwanna-Nzewunwa",
     },
     {
@@ -1348,7 +1340,6 @@ export function createInitialState(): WorkspaceState {
       amount: 500000,
       service: "Founder / take-off grant",
       bank: "OPay",
-      method: "OPay",
       counterparty: "Chieke Nwanna-Nzewunwa",
     },
     {
@@ -1365,13 +1356,12 @@ export function createInitialState(): WorkspaceState {
     {
       id: "led-2026-10-08",
       date: "2026-10-08",
-      description: "Take-off grant from Western Dada Limited",
+      description: "Take-off grant from Western Dada Limited (First Bank transfer)",
       category: "Founder capital",
       type: "Income",
       amount: 1000000,
       service: "Founder / take-off grant",
       bank: "Fidelity Bank",
-      method: "Bank transfer from First Bank",
       counterparty: "Western Dada Limited",
     },
     {
@@ -1386,14 +1376,13 @@ export function createInitialState(): WorkspaceState {
     {
       id: "led-2026-10-31",
       date: "2026-10-31",
-      description: "Website design payment from Aviel Karis Limited",
+      description: "Website design payment from Aviel Karis Limited (GTBank transfer)",
       category: "Client income",
       type: "Income",
       amount: 200000,
       service: "Web Development",
       serviceItem: "Business Websites",
       bank: "Fidelity Bank",
-      method: "Bank transfer from Guaranty Trust Bank",
       counterparty: "Aviel Karis Limited",
     },
     {
@@ -1406,7 +1395,6 @@ export function createInitialState(): WorkspaceState {
       service: "Web Development",
       serviceItem: "Business Websites",
       bank: "OPay",
-      method: "OPay",
       counterparty: "Chieke Nwanna-Nzewunwa",
     },
   ];

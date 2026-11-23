@@ -71,7 +71,6 @@ export function exportLedger(
       "Sub-service",
       "Project",
       "Paid by / to",
-      "How it moved",
       "Bank",
       "Direction",
     ],
@@ -88,7 +87,6 @@ export function exportLedger(
       entry.serviceItem ?? "",
       entry.projectId ? projectName.get(entry.projectId) ?? entry.projectId : "",
       entry.counterparty ?? "",
-      entry.method ?? "",
       entry.bank ?? "",
       entry.type === "Income" ? "Money in" : "Money out",
     ]);
