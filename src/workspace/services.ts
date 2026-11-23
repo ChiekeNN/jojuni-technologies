@@ -121,16 +121,52 @@ export const INCOME_CATEGORIES = [
   "Other income",
 ];
 
-/** Categories offered for expenses. Free text is still allowed. */
-export const EXPENSE_CATEGORIES = [
-  "Infrastructure",
-  "Software",
-  "Contractors",
-  "Payroll",
-  "Marketing",
-  "Equipment",
-  "Professional fees",
-  "Bank charges",
-  "Travel",
-  "Other",
+/**
+ * Categories offered for expenses, grouped so the picker reads like a simple
+ * chart of accounts instead of a short list that only covered hosting bills.
+ * A CEO's flight, a lawyer's invoice, and a bank's stamp duty are all real
+ * costs and each needs somewhere honest to land.
+ */
+export const EXPENSE_CATEGORY_GROUPS: { label: string; items: string[] }[] = [
+  {
+    label: "People",
+    items: ["Payroll", "Salaries & wages", "Contractors", "Recruitment", "Training & development", "Staff welfare"],
+  },
+  {
+    label: "Travel & transport",
+    items: ["Travel", "CEO / executive travel", "Staff travel", "Transport & logistics", "Meals & entertainment"],
+  },
+  {
+    label: "Technology",
+    items: ["Infrastructure", "Software", "Equipment", "Internet & data", "Domains & hosting"],
+  },
+  {
+    label: "Office & operations",
+    items: ["Office & rent", "Utilities", "Office supplies", "Repairs & maintenance", "Insurance", "Bank charges"],
+  },
+  {
+    label: "Growth & compliance",
+    items: [
+      "Marketing",
+      "Professional fees",
+      "Legal & compliance",
+      "Taxes & levies",
+      "Gifts & donations",
+      "Other",
+    ],
+  },
 ];
+
+/**
+ * Categories offered for expenses, flattened for anything that just needs the
+ * plain list. Free text is still allowed in the ledger form.
+ */
+export const EXPENSE_CATEGORIES: string[] = [
+  ...EXPENSE_CATEGORY_GROUPS.flatMap((group) => group.items),
+];
+
+/** Every category accepted for a ledger entry, whichever side it sits on. */
+export function isKnownCategory(category: string | undefined, type: "Income" | "Expense"): boolean {
+  if (!category) return false;
+  return (type === "Income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).includes(category);
+}
