@@ -19,7 +19,7 @@ export function HomePage() {
 
   return (
     <>
-      <section className="relative isolate flex min-h-[760px] items-end overflow-hidden bg-black pt-28 text-white sm:min-h-[840px] lg:h-[100svh] lg:min-h-[760px]">
+      <section className="relative isolate flex min-h-[540px] items-end overflow-hidden bg-black pt-24 text-white sm:min-h-[600px] sm:pt-28 lg:h-[74svh] lg:min-h-[600px] lg:max-h-[820px]">
         <motion.img
           initial={{ scale: 1.06, opacity: 0.65 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -29,16 +29,16 @@ export function HomePage() {
           className="absolute inset-0 -z-20 h-full w-full object-cover object-[64%_center]"
         />
         <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(0,0,0,.97)_0%,rgba(0,0,0,.82)_34%,rgba(0,0,0,.18)_72%,rgba(0,0,0,.42)_100%)]" />
-        <div className="mx-auto w-full max-w-[1480px] px-5 pb-16 sm:px-8 sm:pb-20 lg:px-12 lg:pb-24">
+        <div className="mx-auto w-full max-w-[1480px] px-5 pb-12 sm:px-8 sm:pb-16 lg:px-12 lg:pb-20">
           <motion.div initial={{ y: 44, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.8, delay: 0.28, ease: [0.22, 1, 0.36, 1] }} className="max-w-4xl">
-            <h1 className="text-[clamp(4.1rem,10vw,9.5rem)] font-extrabold leading-[0.78] tracking-[-0.075em]">
+            <h1 className="text-[clamp(3.2rem,8vw,7.5rem)] font-extrabold leading-[0.8] tracking-[-0.07em]">
               Jojuni
               <span className="mt-4 block text-[0.36em] font-semibold leading-none tracking-[-0.035em] text-[#d90429]">Technologies</span>
             </h1>
-            <p className="mt-8 max-w-2xl text-lg leading-relaxed text-white/80 sm:text-xl lg:text-2xl">
+            <p className="mt-6 max-w-2xl text-lg leading-relaxed text-white/80 sm:text-xl lg:text-2xl">
               We build secure websites, software, and intelligent systems that move ambitious businesses forward.
             </p>
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <SiteLink to="/contact" className="group inline-flex items-center justify-center gap-3 bg-[#d90429] px-7 py-4 font-semibold text-white transition hover:bg-white hover:text-black">
                 Build with us
                 <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
